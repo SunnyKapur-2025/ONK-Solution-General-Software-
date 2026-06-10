@@ -72,33 +72,55 @@ The platform serves businesses that handle high volumes of transactions, statuto
 
 | Layer | Technology | Rationale |
 |---|---|---|
-| Frontend | Next.js 14 (App Router) | SSR for performance, API routes for BFF layer, strong TypeScript support |
-| Frontend Hosting | Vercel | Zero-config deployments, edge network, preview deployments per PR |
-| Backend / Database | Supabase (PostgreSQL 15) | Row Level Security enforces tenant isolation at DB level; managed, scalable |
-| Authentication | Supabase Auth | JWT-based, supports email/password, OTP; integrates natively with RLS |
-| Realtime | Supabase Realtime | Dashboard live updates without polling |
-| File Storage | Supabase Storage | Tenant-scoped buckets for logos, attachments, documents |
-| ORM / Query Layer | Prisma (server-side) + Supabase JS Client (client-side) | Prisma for migrations and type safety; Supabase client for RLS-aware queries |
-| Background Jobs | Inngest | Reliable job queues for payroll processing, GST matching, report generation |
-| Email | Resend | Transactional email (invoices, payslips, alerts) with React Email templates |
-| PDF Generation | Puppeteer (via Vercel serverless) or `@react-pdf/renderer` | Branded invoice and report PDF export |
-| Caching | Upstash Redis | Rate limiting, session caching, report result caching |
-| Monitoring & Errors | Sentry | Error tracking with tenant context tagging |
-| Analytics (internal) | PostHog (self-hosted or cloud) | Feature usage analytics without sending financial data externally |
-| Search | PostgreSQL Full-Text Search (built-in) | Party name, invoice number, ledger search — no external dependency |
+| Framework | Next.js 14 (App Router) | SSR for performance, API routes as BFF, strong TypeScript support |
+| Frontend Hosting | Vercel | Zero-config deploys, edge network, preview URL per PR, custom domain free |
+| Backend | Cloudflare Workers | 100,000 free requests/day, zero cold starts (V8 isolates), edge performance |
+| Database | **Neon** (long-term) | Serverless Postgres, economical at scale, Git-like DB branching, no aggressive pausing |
+| Database (early dev) | **Supabase** (short-term) | Postgres + Auth + Storage + Realtime in one dashboard; free tier for development |
+| Authentication | Supabase Auth (dev) → Neon + Cloudflare (prod) | JWT-based, email/password, OTP; integrates with RLS |
+| File Storage | **Cloudflare R2** | No egress fees, generous free tier, tenant-scoped for logos/documents/backups |
+| ORM / Query Layer | Prisma | Type-safe queries, migration management, works with both Neon and Supabase |
+| Background Jobs | Inngest | Payroll runs, GST matching, report generation, scheduled reminders |
+| Email | **Resend** | 3,000 emails/month free, React Email templates, best developer experience |
+| PDF Generation | `@react-pdf/renderer` | Branded invoice and report PDF export, runs in Cloudflare Workers |
+| Monitoring & Errors | **Sentry** | 5,000 errors/month free, exact line + user context, instant Slack/email alerts |
+| Analytics | **PostHog** | 1M events/month free, session replay, funnels, feature flags, A/B testing |
+| Search | PostgreSQL Full-Text Search | Party name, invoice number, ledger search — no external dependency |
+| Payments | **Razorpay** or **Dodo Payments** | Both India-ready, free to integrate, percentage per transaction only |
 
-### 3.2 Additional Recommended Tools
+### 3.2 Supporting Tools
 
 | Purpose | Tool | Notes |
 |---|---|---|
-| Secrets Management | Vercel Environment Variables + Supabase Vault | Never in code; `.env.example` committed with placeholders |
-| Scheduled Tasks (GST deadlines, reminders) | Inngest Cron | GSTR-1 due date alerts, payroll cycle reminders |
-| Audit Logging | Custom `audit_log` table + PostgreSQL triggers | Immutable financial audit trail |
-| Data Validation | Zod | Runtime schema validation at API boundaries |
+| Domain | **Namecheap** or **Cloudflare Registrar** | Cloudflare = actual cost price, zero markup. Avoid GoDaddy. |
+| Secrets Management | Vercel + Cloudflare Environment Variables | Never in code; `.env.example` committed with placeholders only |
+| Scheduled Tasks | Inngest Cron | GSTR-1 due date alerts, payroll cycle reminders, backup triggers |
+| Audit Logging | Custom `audit_log` table + PostgreSQL triggers | Immutable financial audit trail, mandatory for CA compliance |
+| Data Validation | Zod | Runtime schema validation at all API boundaries |
 | Component Library | shadcn/ui + Tailwind CSS | Accessible, composable, no vendor lock-in |
 | State Management | Zustand + TanStack Query | Server state via TanStack Query; local UI state via Zustand |
 | Testing | Vitest + Playwright | Unit/integration tests; end-to-end for critical financial flows |
-| CI/CD | GitHub Actions + Vercel | Automated test runs on PR; Vercel handles preview and production deploys |
+| Version Control | **GitHub** | Free public/private repos; Vercel auto-deploys on every push |
+| CI/CD | GitHub Actions + Vercel | Automated tests on PR; Vercel handles preview and production deploys |
+
+### 3.3 Total Infrastructure Cost
+
+| Tool | What It Covers | Cost |
+|---|---|---|
+| Vercel | Frontend hosting + functions | Free |
+| Cloudflare Workers | Backend / API | Free |
+| Neon | PostgreSQL database | Free |
+| Cloudflare R2 | File storage + backups | Free |
+| Supabase (dev only) | DB + Auth during development | Free |
+| Razorpay / Dodo | Payments | Free (% per transaction) |
+| PostHog | Analytics | Free |
+| Sentry | Error tracking | Free |
+| Resend | Transactional email | Free |
+| GitHub | Version control | Free |
+| **Domain (onksolutions.in)** | **Namecheap / Cloudflare** | **~₹800–1,500/year** |
+| **Total ongoing cost** | | **~₹800–1,500/year** |
+
+> The entire platform runs on free tiers until significant scale. The only mandatory spend is the domain name.
 
 ---
 
