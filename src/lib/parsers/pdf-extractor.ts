@@ -1,4 +1,5 @@
-import pdfParse from 'pdf-parse'
+// Dynamic import — keeps pdf-parse out of webpack's static analysis at build time.
+// pdf-parse loads pdfjs internally and triggers filesystem reads if bundled at init.
 
 export interface PDFExtractResult {
   text: string
@@ -23,6 +24,7 @@ export async function extractPDFText(
   }
 
   try {
+    const pdfParse = (await import('pdf-parse')).default
     const data = await pdfParse(buffer, options)
     return { text: data.text, numPages: data.numpages }
   } catch (err: unknown) {
