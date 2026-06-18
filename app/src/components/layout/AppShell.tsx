@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { ModuleKey } from '@/types'
 import { MODULES } from '@/lib/modules'
 
@@ -69,9 +70,29 @@ interface Props {
 
 export default function AppShell({ tenantName, userName, userRole, enabledModules, children }: Props) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [powerMode, setPowerMode] = useState(false)
+
+  // Ctrl+M toggles Power Mode; Ctrl+N opens new voucher in power mode
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey && e.key === 'm') {
+        e.preventDefault()
+        setPowerMode(p => !p)
+      }
+      if (e.ctrlKey && e.key === 'n') {
+        e.preventDefault()
+        router.push('/voucher')
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [router])
+
+  const isPowerMode = powerMode || pathname === '/voucher'
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className={`flex h-screen overflow-hidden ${isPowerMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
 
       {/* ── Sidebar ── */}
       <aside className="w-56 bg-slate-900 flex flex-col flex-shrink-0 overflow-y-auto">
@@ -81,6 +102,20 @@ export default function AppShell({ tenantName, userName, userRole, enabledModule
             <span className="text-blue-400">ONK</span> Solutions
           </p>
           <p className="text-slate-400 text-xs mt-0.5 truncate">{tenantName}</p>
+        </div>
+
+        {/* Power Mode quick entry */}
+        <div className="px-3 pt-3">
+          <Link href="/voucher"
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors w-full ${
+              pathname === '/voucher'
+                ? 'bg-green-600 text-white'
+                : 'bg-slate-800 hover:bg-slate-700 text-green-400 border border-slate-700'
+            }`}>
+            <span>⌨</span>
+            <span>Power Entry</span>
+            <span className="ml-auto text-[10px] text-slate-500 font-mono">^N</span>
+          </Link>
         </div>
 
         {/* Nav */}
@@ -105,10 +140,31 @@ export default function AppShell({ tenantName, userName, userRole, enabledModule
               </Link>
             )
           })}
+
+          {/* Day Book — always visible */}
+          <Link href="/day-book"
+            className={`flex items-center gap-2.5 mx-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+              pathname === '/day-book'
+                ? 'bg-blue-600 text-white font-medium'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}>
+            <span className="text-base leading-none w-5 text-center">📒</span>
+            <span>Day Book</span>
+          </Link>
         </nav>
 
-        {/* User footer */}
-        <div className="px-4 py-3 border-t border-slate-800">
+        {/* Mode toggle + User footer */}
+        <div className="px-4 py-3 border-t border-slate-800 space-y-2">
+          <button
+            onClick={() => setPowerMode(p => !p)}
+            className={`w-full text-xs px-3 py-1.5 rounded-lg border font-mono transition-colors ${
+              powerMode
+                ? 'bg-green-900 border-green-700 text-green-400'
+                : 'border-slate-700 text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            {powerMode ? '⌨ Power Mode ON' : '⌨ Power Mode (^M)'}
+          </button>
           <p className="text-slate-300 text-xs font-medium truncate">{userName}</p>
           <p className="text-slate-500 text-xs capitalize">{userRole}</p>
         </div>
@@ -116,23 +172,25 @@ export default function AppShell({ tenantName, userName, userRole, enabledModule
 
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
-        <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
-          <div />
-          <div className="flex items-center gap-3">
-            <Link
-              href="/export"
-              className="text-xs text-slate-600 hover:text-slate-800 border border-slate-200 px-3 py-1.5 rounded-lg"
-            >
-              Export to Tally / Busy
-            </Link>
-            <form action="/auth/signout" method="post">
-              <button className="text-xs text-slate-500 hover:text-red-600 transition-colors">
-                Sign out
-              </button>
-            </form>
-          </div>
-        </header>
+        {/* Top bar — hidden in power mode */}
+        {!isPowerMode && (
+          <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+            <div />
+            <div className="flex items-center gap-3">
+              <Link
+                href="/export"
+                className="text-xs text-slate-600 hover:text-slate-800 border border-slate-200 px-3 py-1.5 rounded-lg"
+              >
+                Export to Tally / Busy
+              </Link>
+              <form action="/auth/signout" method="post">
+                <button className="text-xs text-slate-500 hover:text-red-600 transition-colors">
+                  Sign out
+                </button>
+              </form>
+            </div>
+          </header>
+        )}
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">
