@@ -12,24 +12,46 @@ interface TDSRow {
   tdsAmount: number
 }
 
-const TDS_SECTIONS = [
-  { code: '194C', label: '194C — Contractor/Sub-contractor', rate: 1 },
-  { code: '194J', label: '194J — Professional / Technical Services', rate: 10 },
-  { code: '194I', label: '194I — Rent', rate: 10 },
-  { code: '194H', label: '194H — Commission / Brokerage', rate: 5 },
-  { code: '194A', label: '194A — Interest (Bank/FD)', rate: 10 },
-  { code: '192',  label: '192 — Salary', rate: 0 },
+const TDS_SECTIONS_2025 = [
+  // Salary
+  { code: '192',      label: '192 — Salary',                                    rate: 0,    threshold: 'As per slab',                                    note: 'As per applicable slab rates',               group: 'Salary' },
+  // Interest & Dividends
+  { code: '194',      label: '194 — Dividend',                                  rate: 10,   threshold: '₹5,000',                                         note: 'Increased threshold from ₹5,000',            group: 'Interest & Dividends' },
+  { code: '194A',     label: '194A — Interest (Non-Bank)',                       rate: 10,   threshold: '₹50,000 (Sr. Citizen) / ₹40,000 (Bank)',         note: 'Threshold raised in Budget 2024',            group: 'Interest & Dividends' },
+  { code: '194B',     label: '194B — Lottery / Game Show',                       rate: 30,   threshold: '₹10,000',                                        note: '',                                           group: 'Interest & Dividends' },
+  { code: '194K',     label: '194K — Income from Mutual Fund Units',             rate: 10,   threshold: '₹5,000',                                         note: '',                                           group: 'Interest & Dividends' },
+  // Contractors & Professionals
+  { code: '194C',     label: '194C — Contractor (Individual/HUF)',               rate: 1,    threshold: '₹30,000 per payment / ₹1,00,000 per year',       note: '',                                           group: 'Contractors & Professionals' },
+  { code: '194C-Co',  label: '194C — Contractor (Company)',                      rate: 2,    threshold: '₹30,000 per payment / ₹1,00,000 per year',       note: '',                                           group: 'Contractors & Professionals' },
+  { code: '194D',     label: '194D — Insurance Commission',                      rate: 5,    threshold: '₹15,000',                                        note: '',                                           group: 'Contractors & Professionals' },
+  { code: '194H',     label: '194H — Commission / Brokerage',                    rate: 5,    threshold: '₹15,000',                                        note: '',                                           group: 'Contractors & Professionals' },
+  { code: '194J',     label: '194J — Professional Services',                     rate: 10,   threshold: '₹30,000',                                        note: 'Technical services: 2%',                     group: 'Contractors & Professionals' },
+  { code: '194J-T',   label: '194J — Technical Services (non-call centre)',      rate: 2,    threshold: '₹30,000',                                        note: '',                                           group: 'Contractors & Professionals' },
+  { code: '194M',     label: '194M — Payment by Individual/HUF to Contractor',  rate: 5,    threshold: '₹50,00,000 per year',                            note: '',                                           group: 'Contractors & Professionals' },
+  // Rent
+  { code: '194I(a)',  label: '194I(a) — Rent (Plant/Machinery)',                 rate: 2,    threshold: '₹2,40,000 per year',                             note: '',                                           group: 'Rent' },
+  { code: '194I(b)',  label: '194I(b) — Rent (Land/Building/Furniture)',         rate: 10,   threshold: '₹2,40,000 per year',                             note: '',                                           group: 'Rent' },
+  // Others
+  { code: '194N',     label: '194N — Cash Withdrawal from Bank',                 rate: 2,    threshold: '₹1 Crore (₹20L for non-ITR filers)',             note: '',                                           group: 'Others' },
+  { code: '194O',     label: '194O — E-commerce Operator',                       rate: 1,    threshold: '₹5,00,000 per year',                             note: '',                                           group: 'Others' },
+  { code: '194Q',     label: '194Q — Purchase of Goods (Buyer)',                 rate: 0.1,  threshold: '₹50 Lakhs per year',                             note: '',                                           group: 'Others' },
+  { code: '194R',     label: '194R — Perquisites / Benefits',                    rate: 10,   threshold: '₹20,000 per year',                               note: '',                                           group: 'Others' },
+  { code: '206C(1H)', label: '206C(1H) — TCS on Sale of Goods',                 rate: 0.1,  threshold: '₹50 Lakhs (seller)',                             note: 'TCS not TDS',                                group: 'Others' },
 ]
+
+const GROUPS = ['Salary', 'Interest & Dividends', 'Contractors & Professionals', 'Rent', 'Others'] as const
 
 export default function TDSPage() {
   const [rows, setRows] = useState<TDSRow[]>([])
   const [showForm, setShowForm] = useState(false)
   const [saved, setSaved] = useState(false)
   const [form, setForm] = useState({ payeeName: '', section: '194J', amount: '', month: new Date().toISOString().slice(0, 7) })
+  const [calcSection, setCalcSection] = useState('194J')
+  const [calcAmount, setCalcAmount] = useState('')
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault()
-    const sec = TDS_SECTIONS.find(s => s.code === form.section)!
+    const sec = TDS_SECTIONS_2025.find(s => s.code === form.section)!
     const amt = parseFloat(form.amount)
     setRows(prev => [...prev, {
       month: form.month,
@@ -46,6 +68,12 @@ export default function TDSPage() {
   }
 
   const totalTDS = rows.reduce((s, r) => s + r.tdsAmount, 0)
+  const totalGross = rows.reduce((s, r) => s + r.amount, 0)
+
+  const calcSec = TDS_SECTIONS_2025.find(s => s.code === calcSection)
+  const calcGross = parseFloat(calcAmount) || 0
+  const calcTDS = calcSec ? Math.round(calcGross * calcSec.rate / 100 * 100) / 100 : 0
+  const calcNet = calcGross - calcTDS
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-6">
@@ -62,14 +90,15 @@ export default function TDSPage() {
 
       {saved && <div className="mb-4 bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 rounded-lg">TDS entry recorded.</div>}
 
+      {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <p className="text-xs text-slate-500">Total TDS Deducted</p>
           <p className="text-2xl font-bold text-slate-900 mt-1">{formatCurrency(totalTDS)}</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-xs text-slate-500">Entries</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{rows.length}</p>
+          <p className="text-xs text-slate-500">Gross Payments</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{formatCurrency(totalGross)}</p>
         </div>
         <div className="bg-blue-50 rounded-xl border border-blue-100 p-4">
           <p className="text-xs text-blue-600 font-medium">Reminder</p>
@@ -77,6 +106,78 @@ export default function TDSPage() {
         </div>
       </div>
 
+      {/* TDS Calculator */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
+        <h2 className="text-base font-semibold text-slate-800 mb-4">TDS Calculator</h2>
+        <div className="grid grid-cols-3 gap-4 items-end">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">TDS Section</label>
+            <select value={calcSection} onChange={e => setCalcSection(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              {GROUPS.map(grp => (
+                <optgroup key={grp} label={grp}>
+                  {TDS_SECTIONS_2025.filter(s => s.group === grp).map(s => (
+                    <option key={s.code} value={s.code}>{s.label} ({s.rate}%)</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Gross Amount (₹)</label>
+            <input type="number" min="0" step="0.01" value={calcAmount} onChange={e => setCalcAmount(e.target.value)}
+              placeholder="Enter amount"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div className="bg-slate-50 rounded-xl p-3 text-sm space-y-1">
+            <div className="flex justify-between">
+              <span className="text-slate-500">TDS @ {calcSec?.rate ?? 0}%</span>
+              <span className="font-semibold text-red-600">{formatCurrency(calcTDS)}</span>
+            </div>
+            <div className="flex justify-between border-t border-slate-200 pt-1">
+              <span className="text-slate-700 font-medium">Net Payable</span>
+              <span className="font-bold text-slate-900">{formatCurrency(calcNet)}</span>
+            </div>
+          </div>
+        </div>
+        {calcSec?.note && (
+          <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">Note: {calcSec.note}</p>
+        )}
+        {calcSec && (
+          <p className="mt-2 text-xs text-slate-500">Threshold: {calcSec.threshold}</p>
+        )}
+      </div>
+
+      {/* Section reference table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="font-semibold text-slate-800">TDS Rates — Finance Act 2025</h3>
+        </div>
+        {GROUPS.map(grp => (
+          <div key={grp}>
+            <div className="px-6 py-2 bg-slate-50 border-b border-slate-100">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{grp}</p>
+            </div>
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-slate-50">
+                {TDS_SECTIONS_2025.filter(s => s.group === grp).map(s => (
+                  <tr key={s.code} className="hover:bg-slate-50">
+                    <td className="px-6 py-2.5 font-mono text-xs text-slate-500 w-24">{s.code}</td>
+                    <td className="px-4 py-2.5 text-slate-700">{s.label}</td>
+                    <td className="px-4 py-2.5 text-slate-500 text-xs">{s.threshold}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-slate-800 w-16">{s.rate}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+        <div className="px-6 py-3 bg-amber-50 border-t border-amber-100">
+          <p className="text-xs text-amber-700">Rates as per Finance Act 2025 / New Income Tax Act 2025 — consult CA for specific cases</p>
+        </div>
+      </div>
+
+      {/* Add entry form */}
       {showForm && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
           <h2 className="text-base font-semibold text-slate-800 mb-4">Record TDS Deduction</h2>
@@ -96,7 +197,13 @@ export default function TDSPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">TDS Section</label>
               <select value={form.section} onChange={e => setForm(f => ({...f, section: e.target.value}))}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                {TDS_SECTIONS.map(s => <option key={s.code} value={s.code}>{s.label} ({s.rate}%)</option>)}
+                {GROUPS.map(grp => (
+                  <optgroup key={grp} label={grp}>
+                    {TDS_SECTIONS_2025.filter(s => s.group === grp).map(s => (
+                      <option key={s.code} value={s.code}>{s.label} ({s.rate}%)</option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </div>
             <div>
@@ -114,6 +221,7 @@ export default function TDSPage() {
         </div>
       )}
 
+      {/* TDS Register */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h3 className="font-semibold text-slate-800">TDS Register</h3>
@@ -131,9 +239,10 @@ export default function TDSPage() {
                 <th className="text-left px-5 py-3 font-medium text-slate-600">Month</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Section</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Payee</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-600">Amount</th>
+                <th className="text-right px-4 py-3 font-medium text-slate-600">Gross Amount</th>
                 <th className="text-right px-4 py-3 font-medium text-slate-600">Rate</th>
                 <th className="text-right px-4 py-3 font-medium text-slate-600">TDS</th>
+                <th className="text-right px-4 py-3 font-medium text-slate-600">Net Payable</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -145,13 +254,17 @@ export default function TDSPage() {
                   <td className="px-4 py-3 text-right font-mono">{formatCurrency(r.amount)}</td>
                   <td className="px-4 py-3 text-right text-slate-500">{r.tdsRate}%</td>
                   <td className="px-4 py-3 text-right font-mono font-semibold text-red-600">{formatCurrency(r.tdsAmount)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-slate-700">{formatCurrency(r.amount - r.tdsAmount)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot className="bg-slate-100 border-t-2 border-slate-300">
               <tr>
-                <td colSpan={5} className="px-5 py-3 font-bold text-slate-700">Total TDS</td>
+                <td colSpan={3} className="px-5 py-3 font-bold text-slate-700">Total</td>
+                <td className="px-4 py-3 text-right font-bold font-mono text-slate-700">{formatCurrency(totalGross)}</td>
+                <td />
                 <td className="px-4 py-3 text-right font-bold font-mono text-red-700">{formatCurrency(totalTDS)}</td>
+                <td className="px-4 py-3 text-right font-bold font-mono text-slate-700">{formatCurrency(totalGross - totalTDS)}</td>
               </tr>
             </tfoot>
           </table>

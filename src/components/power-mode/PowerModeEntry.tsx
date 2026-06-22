@@ -74,22 +74,6 @@ export default function PowerModeEntry({ parties, accounts, onSave }: Props) {
   const narrationRef = useRef<HTMLInputElement>(null)
   const dateRef = useRef<HTMLInputElement>(null)
 
-  // Global keyboard shortcuts
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.ctrlKey && e.key === 'a') { e.preventDefault(); handleSave() }
-      if (e.key === 'F4') { e.preventDefault(); setVoucherType('contra') }
-      if (e.key === 'F5') { e.preventDefault(); setVoucherType('payment') }
-      if (e.key === 'F6') { e.preventDefault(); setVoucherType('receipt') }
-      if (e.key === 'F7') { e.preventDefault(); setVoucherType('journal') }
-      if (e.key === 'F8') { e.preventDefault(); setVoucherType('sales') }
-      if (e.key === 'F9') { e.preventDefault(); setVoucherType('purchase') }
-      if (e.key === 'Escape') { resetForm() }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  })
-
   function resetForm() {
     setPartySearch(''); setPartyId(''); setNarration(''); setReference('')
     setLines([{ accountId: '', accountName: '', debit: 0, credit: 0, narration: '' }])
@@ -140,7 +124,8 @@ export default function PowerModeEntry({ parties, accounts, onSave }: Props) {
   const totalCredit = lines.reduce((s, l) => s + (l.credit || 0), 0)
   const isBalanced  = Math.abs(totalDebit - totalCredit) < 0.01
 
-  async function handleSave() {
+  // Declare handleSave BEFORE useEffect so it can be referenced in deps
+  const handleSave = useCallback(async () => {
     if (!isBalanced) { setError('Entry not balanced. Debit must equal Credit.'); return }
     if (lines.some(l => !l.accountId)) { setError('All lines must have an account selected.'); return }
     setError(''); setSaving(true)
@@ -154,7 +139,23 @@ export default function PowerModeEntry({ parties, accounts, onSave }: Props) {
     } finally {
       setSaving(false)
     }
-  }
+  }, [isBalanced, lines, onSave, voucherType, date, partyId, narration, reference])
+
+  // Global keyboard shortcuts — F4-F9 for voucher type, Ctrl+A to save, Esc to reset
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey && e.key === 'a') { e.preventDefault(); handleSave() }
+      if (e.key === 'F4') { e.preventDefault(); setVoucherType('contra') }
+      if (e.key === 'F5') { e.preventDefault(); setVoucherType('payment') }
+      if (e.key === 'F6') { e.preventDefault(); setVoucherType('receipt') }
+      if (e.key === 'F7') { e.preventDefault(); setVoucherType('journal') }
+      if (e.key === 'F8') { e.preventDefault(); setVoucherType('sales') }
+      if (e.key === 'F9') { e.preventDefault(); setVoucherType('purchase') }
+      if (e.key === 'Escape') { resetForm() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [handleSave])
 
   return (
     <div className="bg-slate-900 text-green-400 font-mono text-sm rounded-xl overflow-hidden border border-slate-700">

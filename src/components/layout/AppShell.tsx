@@ -160,6 +160,7 @@ export default function AppShell({ tenantName, userName, userRole, enabledModule
             { href: '/ledger-create', icon: '📝', label: 'Ledger Creation' },
             { href: '/settings', icon: '⚙️', label: 'Settings' },
             { href: '/users', icon: '👤', label: 'Users & Rights' },
+            ...(userRole === 'owner' || userRole === 'superadmin' ? [{ href: '/admin', icon: '🏢', label: 'Client Accounts' }] : []),
             { href: '/help', icon: '❓', label: 'Help & Support' },
           ].map(({ href, icon, label }) => (
             <Link

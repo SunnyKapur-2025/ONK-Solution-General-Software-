@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import InvoiceTemplate from '@/components/invoice/InvoiceTemplate'
 
 interface Settings {
   name: string
@@ -17,10 +18,105 @@ interface Settings {
 }
 
 interface InvoicePersonalization {
+  invoiceTitle: string
   invoicePrefix: string
+  bankName: string
+  bankAccountNo: string
+  bankIFSC: string
+  bankBranch: string
   invoiceFooter: string
+  termsAndConditions: string
   showBankDetails: boolean
-  showGstin: boolean
+  showSeal: boolean
+  showSignature: boolean
+  logoUrl: string
+  sealUrl: string
+  signatureUrl: string
+}
+
+const DEFAULT_INVOICE_SETTINGS: InvoicePersonalization = {
+  invoiceTitle: 'Tax Invoice',
+  invoicePrefix: 'INV-',
+  bankName: '',
+  bankAccountNo: '',
+  bankIFSC: '',
+  bankBranch: '',
+  invoiceFooter: '',
+  termsAndConditions: '',
+  showBankDetails: true,
+  showSeal: true,
+  showSignature: true,
+  logoUrl: '',
+  sealUrl: '',
+  signatureUrl: '',
+}
+
+const STORAGE_KEY = 'onk_invoice_settings'
+
+function ImageUpload({
+  label,
+  value,
+  onChange,
+  hint,
+}: {
+  label: string
+  value: string
+  onChange: (base64: string) => void
+  hint?: string
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') onChange(reader.result)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      {hint && <p className="text-xs text-slate-500 mb-2">{hint}</p>}
+      <div className="flex items-center gap-4">
+        {value ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={value} alt={label} className="h-16 w-16 object-contain rounded border border-slate-200 bg-slate-50" />
+        ) : (
+          <div className="h-16 w-16 rounded border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-slate-400 text-xs">
+            None
+          </div>
+        )}
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 transition-colors"
+          >
+            {value ? 'Replace' : 'Upload'}
+          </button>
+          {value && (
+            <button
+              type="button"
+              onClick={() => { onChange(''); if (inputRef.current) inputRef.current.value = '' }}
+              className="text-sm text-red-500 hover:text-red-700 transition-colors"
+            >
+              Remove
+            </button>
+          )}
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg"
+            className="hidden"
+            onChange={handleFile}
+          />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function SettingsPage() {
@@ -29,16 +125,12 @@ export default function SettingsPage() {
     address: '', city: '', state: '', pincode: '',
     financial_year_start: 4, logo_url: null,
   })
-  const [invoicePersonalization, setInvoicePersonalization] = useState<InvoicePersonalization>({
-    invoicePrefix: 'INV-',
-    invoiceFooter: '',
-    showBankDetails: true,
-    showGstin: true,
-  })
+  const [invoice, setInvoice] = useState<InvoicePersonalization>(DEFAULT_INVOICE_SETTINGS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+  const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
     fetch('/api/settings')
@@ -48,7 +140,22 @@ export default function SettingsPage() {
       })
       .catch(() => setError('Failed to load settings'))
       .finally(() => setLoading(false))
+
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) setInvoice({ ...DEFAULT_INVOICE_SETTINGS, ...JSON.parse(saved) })
+    } catch {
+      // ignore
+    }
   }, [])
+
+  function saveInvoiceSettings() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(invoice))
+    } catch {
+      // ignore
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -74,6 +181,7 @@ export default function SettingsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to save')
       setSettings(data.settings)
+      saveInvoiceSettings()
       setSuccess('Settings saved successfully.')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save settings')
@@ -93,6 +201,60 @@ export default function SettingsPage() {
       />
     </div>
   )
+
+  const invField = (label: string, key: keyof InvoicePersonalization, placeholder = '') => (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <input
+        type="text"
+        value={(invoice[key] as string) ?? ''}
+        onChange={e => setInvoice(p => ({ ...p, [key]: e.target.value }))}
+        placeholder={placeholder}
+        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+    </div>
+  )
+
+  // Sample data for preview
+  const previewProps = {
+    companyName: settings.name || 'Your Company Name',
+    companyAddress: settings.address || '123, Sample Street',
+    companyCity: settings.city || 'Mumbai',
+    companyState: settings.state || 'Maharashtra',
+    companyPincode: settings.pincode || '400001',
+    companyPhone: settings.phone || '9876543210',
+    companyEmail: settings.email || 'info@company.com',
+    companyGSTIN: settings.gstin || '27AABCU9603R1ZX',
+    companyPAN: settings.pan || 'AABCU9603R',
+    logoUrl: invoice.logoUrl || undefined,
+    sealUrl: invoice.sealUrl || undefined,
+    signatureUrl: invoice.signatureUrl || undefined,
+    invoiceNumber: `${invoice.invoicePrefix}0001`,
+    invoiceDate: new Date().toLocaleDateString('en-IN'),
+    dueDate: new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-IN'),
+    customerName: 'Sample Customer Pvt Ltd',
+    customerAddress: '456, Customer Lane, Delhi - 110001',
+    customerGSTIN: '07AAACD1234M1ZV',
+    items: [
+      { description: 'Professional Services - Web Development', qty: 1, rate: 50000, gstRate: 18, amount: 50000, cgst: 4500, sgst: 4500, igst: 0 },
+      { description: 'Annual Maintenance Contract', qty: 2, rate: 10000, gstRate: 18, amount: 20000, cgst: 1800, sgst: 1800, igst: 0 },
+    ],
+    subtotal: 70000,
+    totalCGST: 6300,
+    totalSGST: 6300,
+    totalIGST: 0,
+    totalAmount: 82600,
+    invoiceTitle: invoice.invoiceTitle,
+    bankName: invoice.bankName,
+    bankAccountNo: invoice.bankAccountNo,
+    bankIFSC: invoice.bankIFSC,
+    bankBranch: invoice.bankBranch,
+    footerText: invoice.invoiceFooter,
+    showBankDetails: invoice.showBankDetails,
+    showSeal: invoice.showSeal,
+    showSignature: invoice.showSignature,
+    termsAndConditions: invoice.termsAndConditions,
+  }
 
   if (loading) {
     return (
@@ -150,49 +312,121 @@ export default function SettingsPage() {
       </div>
 
       {/* Invoice Personalization */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
-        <h2 className="text-base font-semibold text-slate-800">Invoice Personalization</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-6">
+        <div className="flex items-center justify-between">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Invoice Prefix</label>
-            <input
-              type="text"
-              value={invoicePersonalization.invoicePrefix}
-              onChange={e => setInvoicePersonalization(p => ({ ...p, invoicePrefix: e.target.value }))}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="INV-"
+            <h2 className="text-base font-semibold text-slate-800">Invoice Personalization</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Customize how your invoices look to customers. Saved locally.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowPreview(true)}
+            className="text-sm bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+          >
+            <span>Preview Invoice</span>
+          </button>
+        </div>
+
+        {/* Branding images */}
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700 mb-4">Branding</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <ImageUpload
+              label="Company Logo"
+              value={invoice.logoUrl}
+              onChange={v => setInvoice(p => ({ ...p, logoUrl: v }))}
+              hint="PNG or JPG, appears top-left on invoice"
+            />
+            <ImageUpload
+              label="Digital Seal"
+              value={invoice.sealUrl}
+              onChange={v => setInvoice(p => ({ ...p, sealUrl: v }))}
+              hint="Company stamp/seal image"
+            />
+            <ImageUpload
+              label="Authorized Signatory"
+              value={invoice.signatureUrl}
+              onChange={v => setInvoice(p => ({ ...p, signatureUrl: v }))}
+              hint="Signature image of authorized person"
             />
           </div>
         </div>
+
+        {/* Invoice settings */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Invoice Footer Text</label>
-          <textarea
-            value={invoicePersonalization.invoiceFooter}
-            onChange={e => setInvoicePersonalization(p => ({ ...p, invoiceFooter: e.target.value }))}
-            rows={3}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Thank you for your business!"
-          />
+          <h3 className="text-sm font-semibold text-slate-700 mb-4">Invoice Settings</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Invoice Title</label>
+              <select
+                value={invoice.invoiceTitle}
+                onChange={e => setInvoice(p => ({ ...p, invoiceTitle: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Tax Invoice">Tax Invoice</option>
+                <option value="Proforma Invoice">Proforma Invoice</option>
+                <option value="Service Invoice">Service Invoice</option>
+                <option value="Receipt Voucher">Receipt Voucher</option>
+              </select>
+            </div>
+            {invField('Invoice Number Prefix', 'invoicePrefix', 'INV-')}
+          </div>
         </div>
+
+        {/* Bank details */}
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700 mb-4">Bank Details on Invoice</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {invField('Bank Name', 'bankName', 'e.g., HDFC Bank')}
+            {invField('Account Number', 'bankAccountNo', 'e.g., 50100123456789')}
+            {invField('IFSC Code', 'bankIFSC', 'e.g., HDFC0001234')}
+            {invField('Branch', 'bankBranch', 'e.g., Andheri West, Mumbai')}
+          </div>
+        </div>
+
+        {/* Footer & Terms */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-slate-700">Footer & Terms</h3>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Invoice Footer Text</label>
+            <textarea
+              value={invoice.invoiceFooter}
+              onChange={e => setInvoice(p => ({ ...p, invoiceFooter: e.target.value }))}
+              rows={2}
+              placeholder="e.g., Thank you for your business!"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Terms & Conditions</label>
+            <textarea
+              value={invoice.termsAndConditions}
+              onChange={e => setInvoice(p => ({ ...p, termsAndConditions: e.target.value }))}
+              rows={4}
+              placeholder={'1. Payment due within 30 days.\n2. Goods once sold will not be returned.\n3. Subject to jurisdiction of local courts.'}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* Toggles */}
         <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={invoicePersonalization.showBankDetails}
-              onChange={e => setInvoicePersonalization(p => ({ ...p, showBankDetails: e.target.checked }))}
-              className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-            />
-            <span className="text-sm text-slate-700">Show bank details on invoice</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={invoicePersonalization.showGstin}
-              onChange={e => setInvoicePersonalization(p => ({ ...p, showGstin: e.target.checked }))}
-              className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-            />
-            <span className="text-sm text-slate-700">Show GSTIN on invoice</span>
-          </label>
+          <h3 className="text-sm font-semibold text-slate-700">Display Options</h3>
+          {[
+            { key: 'showBankDetails' as const, label: 'Show bank details on invoice' },
+            { key: 'showSeal' as const, label: 'Show company seal on invoice' },
+            { key: 'showSignature' as const, label: 'Show authorized signature on invoice' },
+          ].map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={invoice[key] as boolean}
+                onChange={e => setInvoice(p => ({ ...p, [key]: e.target.checked }))}
+                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm text-slate-700">{label}</span>
+            </label>
+          ))}
         </div>
       </div>
 
@@ -205,6 +439,37 @@ export default function SettingsPage() {
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
       </div>
+
+      {/* Invoice Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto py-8">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 no-print">
+              <div>
+                <h3 className="font-semibold text-slate-800">Invoice Preview</h3>
+                <p className="text-xs text-slate-500">This is a sample preview with dummy data</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => window.print()}
+                  className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Print
+                </button>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="text-sm text-slate-500 hover:text-slate-700 border border-slate-200 px-4 py-2 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="p-4 overflow-auto">
+              <InvoiceTemplate {...previewProps} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
