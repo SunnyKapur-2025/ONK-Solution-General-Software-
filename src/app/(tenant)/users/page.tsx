@@ -23,7 +23,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<TenantUser[]>([])
   const [loading, setLoading] = useState(true)
   const [showInvite, setShowInvite] = useState(false)
-  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'staff' })
+  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'staff', password: '' })
   const [inviting, setInviting] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
@@ -51,9 +51,9 @@ export default function UsersPage() {
         body: JSON.stringify(inviteForm),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to invite user')
-      setSuccess(`Invite sent to ${inviteForm.email}`)
-      setInviteForm({ name: '', email: '', role: 'staff' })
+      if (!res.ok) throw new Error(data.error || 'Failed to create user')
+      setSuccess(`User ${inviteForm.name} created. They can log in with ${inviteForm.email}.`)
+      setInviteForm({ name: '', email: '', role: 'staff', password: '' })
       setShowInvite(false)
       fetchUsers()
     } catch (err: unknown) {
@@ -109,56 +109,48 @@ export default function UsersPage() {
       {showInvite && (
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <h2 className="text-base font-semibold text-slate-800 mb-4">Invite New User</h2>
-          <form onSubmit={handleInvite} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+          <form onSubmit={handleInvite} className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
-              <input
-                type="text"
-                required
-                value={inviteForm.name}
+              <label className="block text-sm font-medium text-slate-700 mb-1">Full Name *</label>
+              <input type="text" required value={inviteForm.name}
                 onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Full name"
-              />
+                placeholder="Full name" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-              <input
-                type="email"
-                required
-                value={inviteForm.email}
+              <label className="block text-sm font-medium text-slate-700 mb-1">Email *</label>
+              <input type="email" required value={inviteForm.email}
                 onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="user@company.com"
-              />
+                placeholder="user@company.com" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-              <select
-                value={inviteForm.role}
-                onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}
+              <label className="block text-sm font-medium text-slate-700 mb-1">Temporary Password * (min 8 chars)</label>
+              <input type="password" required minLength={8} value={inviteForm.password}
+                onChange={e => setInviteForm(f => ({ ...f, password: e.target.value }))}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+                placeholder="Min. 8 characters" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Role *</label>
+              <select value={inviteForm.role}
+                onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="owner">Owner</option>
                 <option value="accountant">Accountant</option>
                 <option value="manager">Manager</option>
                 <option value="staff">Staff</option>
               </select>
             </div>
-            <div className="sm:col-span-3 flex gap-3 justify-end">
-              <button
-                type="button"
-                onClick={() => setShowInvite(false)}
-                className="text-slate-600 text-sm font-medium px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
-              >
+            <p className="sm:col-span-2 text-xs text-slate-400">The user can change their password after first login via Settings → Reset Password.</p>
+            <div className="sm:col-span-2 flex gap-3 justify-end">
+              <button type="button" onClick={() => setShowInvite(false)}
+                className="text-slate-600 text-sm font-medium px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
                 Cancel
               </button>
-              <button
-                type="submit"
-                disabled={inviting}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
-              >
-                {inviting ? 'Sending...' : 'Send Invite'}
+              <button type="submit" disabled={inviting}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+                {inviting ? 'Creating…' : 'Create User'}
               </button>
             </div>
           </form>

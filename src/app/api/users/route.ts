@@ -48,19 +48,26 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { email, name, role } = body
+    const { email, name, role, password } = body
 
-    if (!email || !name || !role) {
-      return NextResponse.json({ error: 'email, name, and role are required' }, { status: 400 })
+    if (!email || !name || !role || !password) {
+      return NextResponse.json({ error: 'email, name, role, and password are required' }, { status: 400 })
+    }
+
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
     }
 
     const adminClient = await createAdminClient()
 
-    const { data: authData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      data: { name },
+    const { data: authData, error: createError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name },
     })
 
-    if (inviteError) return NextResponse.json({ error: inviteError.message }, { status: 500 })
+    if (createError) return NextResponse.json({ error: createError.message }, { status: 500 })
 
     const { data: newUser, error: insertError } = await supabase
       .from('tenant_users')

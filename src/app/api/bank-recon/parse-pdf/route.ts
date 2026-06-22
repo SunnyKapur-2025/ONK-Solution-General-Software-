@@ -39,7 +39,6 @@ function extractTransactions(text: string): BankTransaction[] {
       .trim()
 
     const isDr = /\bDr\b/i.test(line) || /debit|withdrawal/i.test(line)
-    const isCr = /\bCr\b/i.test(line) || /credit|deposit/i.test(line)
 
     let debit = 0, credit = 0, balance = 0
 
@@ -66,19 +65,37 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File | null
     if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
 
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      return NextResponse.json({ error: 'Only PDF files are accepted' }, { status: 400 })
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer())
 
-    // Dynamic import keeps pdf-parse out of the build-time module graph
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string; numpages: number }>
-    const pdf = await pdfParse(buffer)
+    let pdfText = ''
+    let pageCount = 0
 
-    const transactions = extractTransactions(pdf.text)
+    try {
+      // Pass options to prevent pdf-parse from accessing filesystem during init
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const pdfParse = require('pdf-parse')
+      const pdf = await pdfParse(buffer, { max: 0 })
+      pdfText = pdf.text
+      pageCount = pdf.numpages
+    } catch (pdfErr: unknown) {
+      const msg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr)
+      // If it's the canvas/DOMMatrix issue from pdfjs, return a clear message
+      if (msg.includes('DOMMatrix') || msg.includes('canvas') || msg.includes('ENOENT')) {
+        return NextResponse.json({
+          error: 'This PDF could not be processed automatically. Please download your bank statement as CSV from net banking and upload that instead.',
+          transactions: [],
+        })
+      }
+      throw pdfErr
+    }
 
-    return NextResponse.json({
-      transactions,
-      pageCount: pdf.numpages,
-    })
+    const transactions = extractTransactions(pdfText)
+
+    return NextResponse.json({ transactions, pageCount })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'PDF parsing failed'
     return NextResponse.json({ error: msg }, { status: 500 })

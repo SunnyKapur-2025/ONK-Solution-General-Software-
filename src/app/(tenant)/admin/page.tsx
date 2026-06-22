@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { INDUSTRIES, INDUSTRY_GROUPS, getIndustriesByGroup } from '@/lib/industries'
 
 interface Tenant {
   id: string
@@ -15,20 +16,9 @@ interface Tenant {
   state: string
 }
 
-const INDUSTRIES_QUICK = [
-  { id: 'service_general', label: 'General Service' },
-  { id: 'trading', label: 'Trading / Retail' },
-  { id: 'manufacturing', label: 'Manufacturing' },
-  { id: 'professional', label: 'Professional Services' },
-  { id: 'bpo', label: 'BPO / Call Centre' },
-  { id: 'manpower', label: 'Manpower / Staffing' },
-  { id: 'security', label: 'Security Agency' },
-  { id: 'freight', label: 'Freight & Logistics' },
-  { id: 'construction', label: 'Construction' },
-  { id: 'healthcare', label: 'Healthcare / Clinic' },
-  { id: 'education', label: 'Education / Coaching' },
-  { id: 'hospitality', label: 'Hotel / Restaurant' },
-]
+// Use the canonical industry list so IDs match the API validation
+const INDUSTRIES_BY_GROUP = getIndustriesByGroup()
+void INDUSTRIES // suppress unused warning
 
 const PLAN_COLORS: Record<string, string> = {
   starter: 'bg-slate-100 text-slate-600',
@@ -46,7 +36,7 @@ export default function AdminPage() {
   const [createSuccess, setCreateSuccess] = useState('')
 
   const [form, setForm] = useState({
-    name: '', slug: '', industry_id: 'service_general',
+    name: '', slug: '', industry_id: 'consulting',
     gstin: '', pan: '', phone: '', email: '',
     address: '', city: '', state: '', pincode: '',
     financial_year_start: 4,
@@ -149,7 +139,11 @@ export default function AdminPage() {
                 <div>
                   <label className={lbl}>Industry</label>
                   <select value={form.industry_id} onChange={e => setForm(f => ({ ...f, industry_id: e.target.value }))} className={inp + ' bg-white'}>
-                    {INDUSTRIES_QUICK.map(i => <option key={i.id} value={i.id}>{i.label}</option>)}
+                    {Object.entries(INDUSTRIES_BY_GROUP).map(([group, industries]) => (
+                      <optgroup key={group} label={INDUSTRY_GROUPS[group] || group}>
+                        {industries.map(i => <option key={i.id} value={i.id}>{i.label}</option>)}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
                 <div>
