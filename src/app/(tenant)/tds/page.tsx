@@ -12,34 +12,51 @@ interface TDSRow {
   tdsAmount: number
 }
 
+// Rates & thresholds as per Finance Act 2025 / New Income Tax Bill 2025 (effective FY 2025-26)
 const TDS_SECTIONS_2025 = [
-  // Salary
-  { code: '192',      label: '192 — Salary',                                    rate: 0,    threshold: 'As per slab',                                    note: 'As per applicable slab rates',               group: 'Salary' },
-  // Interest & Dividends
-  { code: '194',      label: '194 — Dividend',                                  rate: 10,   threshold: '₹5,000',                                         note: 'Increased threshold from ₹5,000',            group: 'Interest & Dividends' },
-  { code: '194A',     label: '194A — Interest (Non-Bank)',                       rate: 10,   threshold: '₹50,000 (Sr. Citizen) / ₹40,000 (Bank)',         note: 'Threshold raised in Budget 2024',            group: 'Interest & Dividends' },
-  { code: '194B',     label: '194B — Lottery / Game Show',                       rate: 30,   threshold: '₹10,000',                                        note: '',                                           group: 'Interest & Dividends' },
-  { code: '194K',     label: '194K — Income from Mutual Fund Units',             rate: 10,   threshold: '₹5,000',                                         note: '',                                           group: 'Interest & Dividends' },
-  // Contractors & Professionals
-  { code: '194C',     label: '194C — Contractor (Individual/HUF)',               rate: 1,    threshold: '₹30,000 per payment / ₹1,00,000 per year',       note: '',                                           group: 'Contractors & Professionals' },
-  { code: '194C-Co',  label: '194C — Contractor (Company)',                      rate: 2,    threshold: '₹30,000 per payment / ₹1,00,000 per year',       note: '',                                           group: 'Contractors & Professionals' },
-  { code: '194D',     label: '194D — Insurance Commission',                      rate: 5,    threshold: '₹15,000',                                        note: '',                                           group: 'Contractors & Professionals' },
-  { code: '194H',     label: '194H — Commission / Brokerage',                    rate: 5,    threshold: '₹15,000',                                        note: '',                                           group: 'Contractors & Professionals' },
-  { code: '194J',     label: '194J — Professional Services',                     rate: 10,   threshold: '₹30,000',                                        note: 'Technical services: 2%',                     group: 'Contractors & Professionals' },
-  { code: '194J-T',   label: '194J — Technical Services (non-call centre)',      rate: 2,    threshold: '₹30,000',                                        note: '',                                           group: 'Contractors & Professionals' },
-  { code: '194M',     label: '194M — Payment by Individual/HUF to Contractor',  rate: 5,    threshold: '₹50,00,000 per year',                            note: '',                                           group: 'Contractors & Professionals' },
-  // Rent
-  { code: '194I(a)',  label: '194I(a) — Rent (Plant/Machinery)',                 rate: 2,    threshold: '₹2,40,000 per year',                             note: '',                                           group: 'Rent' },
-  { code: '194I(b)',  label: '194I(b) — Rent (Land/Building/Furniture)',         rate: 10,   threshold: '₹2,40,000 per year',                             note: '',                                           group: 'Rent' },
-  // Others
-  { code: '194N',     label: '194N — Cash Withdrawal from Bank',                 rate: 2,    threshold: '₹1 Crore (₹20L for non-ITR filers)',             note: '',                                           group: 'Others' },
-  { code: '194O',     label: '194O — E-commerce Operator',                       rate: 1,    threshold: '₹5,00,000 per year',                             note: '',                                           group: 'Others' },
-  { code: '194Q',     label: '194Q — Purchase of Goods (Buyer)',                 rate: 0.1,  threshold: '₹50 Lakhs per year',                             note: '',                                           group: 'Others' },
-  { code: '194R',     label: '194R — Perquisites / Benefits',                    rate: 10,   threshold: '₹20,000 per year',                               note: '',                                           group: 'Others' },
-  { code: '206C(1H)', label: '206C(1H) — TCS on Sale of Goods',                 rate: 0.1,  threshold: '₹50 Lakhs (seller)',                             note: 'TCS not TDS',                                group: 'Others' },
+  // ── Salary ──────────────────────────────────────────────────────────────
+  { code: '192',       label: '192 — Salary',                                    rate: 0,    threshold: 'Basic exemption limit (₹3L new regime / ₹2.5L old)',  note: 'New regime default from FY 2025-26; slab deduction at source',         group: 'Salary' },
+  { code: '192A',      label: '192A — PF Premature Withdrawal',                  rate: 10,   threshold: '₹50,000',                                             note: '20% if PAN not furnished',                                             group: 'Salary' },
+
+  // ── Interest & Dividends ─────────────────────────────────────────────────
+  { code: '194',       label: '194 — Dividend (Company)',                        rate: 10,   threshold: '₹10,000 per year',                                    note: 'Threshold raised from ₹5,000 (Finance Act 2025)',                      group: 'Interest & Dividends' },
+  { code: '194A',      label: '194A — Interest (Bank / Post Office)',            rate: 10,   threshold: '₹1,00,000 (Sr. Citizen) / ₹50,000 (Others) p.a.',    note: 'Revised thresholds Finance Act 2025; 20% if PAN absent',               group: 'Interest & Dividends' },
+  { code: '194A-NB',   label: '194A — Interest (Non-Banking)',                   rate: 10,   threshold: '₹10,000 per year',                                    note: '',                                                                     group: 'Interest & Dividends' },
+  { code: '194B',      label: '194B — Lottery / Crossword / Game Show',          rate: 30,   threshold: '₹10,000 per transaction',                             note: 'Deduct at source before paying prize',                                 group: 'Interest & Dividends' },
+  { code: '194BB',     label: '194BB — Winnings from Horse Race',                rate: 30,   threshold: '₹10,000 per transaction',                             note: '',                                                                     group: 'Interest & Dividends' },
+  { code: '194K',      label: '194K — Mutual Fund Units / UTI',                  rate: 10,   threshold: '₹5,000 per year',                                     note: 'Only on income distributions, not capital repayment',                  group: 'Interest & Dividends' },
+  { code: '194LBA',    label: '194LBA — Business Trust (REIT/InvIT) Income',     rate: 10,   threshold: 'Any amount',                                           note: '5% for non-resident unit holders',                                     group: 'Interest & Dividends' },
+
+  // ── Contractors & Professionals ──────────────────────────────────────────
+  { code: '194C',      label: '194C — Contractor (Individual / HUF)',            rate: 1,    threshold: '₹30,000 single / ₹1,00,000 aggregate p.a.',           note: '',                                                                     group: 'Contractors & Professionals' },
+  { code: '194C-Co',   label: '194C — Contractor (Company / Firm)',              rate: 2,    threshold: '₹30,000 single / ₹1,00,000 aggregate p.a.',           note: '',                                                                     group: 'Contractors & Professionals' },
+  { code: '194D',      label: '194D — Insurance Commission',                     rate: 2,    threshold: '₹20,000 per year',                                    note: 'Rate reduced to 2% & threshold raised (Finance Act 2025)',             group: 'Contractors & Professionals' },
+  { code: '194G',      label: '194G — Commission on Lottery Tickets',            rate: 2,    threshold: '₹20,000 per year',                                    note: 'Threshold raised from ₹15,000 (Finance Act 2025)',                     group: 'Contractors & Professionals' },
+  { code: '194H',      label: '194H — Commission / Brokerage',                   rate: 2,    threshold: '₹20,000 per year',                                    note: 'Rate reduced to 2% & threshold raised (Finance Act 2025)',             group: 'Contractors & Professionals' },
+  { code: '194J',      label: '194J — Professional Fees (Doctor, CA, Legal…)',   rate: 10,   threshold: '₹50,000 per year',                                    note: 'Threshold raised from ₹30,000 (Finance Act 2025)',                     group: 'Contractors & Professionals' },
+  { code: '194J-T',    label: '194J — Technical Services / Royalty / Call Ctr',  rate: 2,    threshold: '₹50,000 per year',                                    note: 'Reduced rate; covers software royalty, call-centre work',              group: 'Contractors & Professionals' },
+  { code: '194M',      label: '194M — Payment by Individual/HUF (Contractual)',  rate: 2,    threshold: '₹50,00,000 per year',                                 note: 'Covers 194C/H/J payments by individuals not liable to audit',          group: 'Contractors & Professionals' },
+  { code: '194T',      label: '194T — Salary/Interest/Commission to Partners',   rate: 10,   threshold: '₹20,000 per year',                                    note: 'NEW — effective 1 Apr 2025 (Finance Act 2024 §68); firm deducts TDS on partner remuneration', group: 'Contractors & Professionals' },
+
+  // ── Rent ─────────────────────────────────────────────────────────────────
+  { code: '194I(a)',   label: '194I(a) — Rent: Plant, Machinery, Equipment',     rate: 2,    threshold: '₹50,000 per month (₹6,00,000 p.a.)',                 note: 'Threshold raised (Finance Act 2025)',                                  group: 'Rent' },
+  { code: '194I(b)',   label: '194I(b) — Rent: Land / Building / Furniture',     rate: 10,   threshold: '₹50,000 per month (₹6,00,000 p.a.)',                 note: 'Threshold raised (Finance Act 2025)',                                  group: 'Rent' },
+  { code: '194IB',     label: '194IB — Rent by Individual/HUF (non-audit)',      rate: 5,    threshold: '₹50,000 per month',                                   note: 'Deduct once at last month / vacating the property',                   group: 'Rent' },
+  { code: '194IC',     label: '194IC — Payment under Joint Development Agreement', rate: 10, threshold: 'Any amount',                                           note: 'Consideration (cash/kind) to land owner',                             group: 'Rent' },
+
+  // ── Property ─────────────────────────────────────────────────────────────
+  { code: '194-IA',    label: '194-IA — Purchase of Immovable Property',         rate: 1,    threshold: '₹50,00,000 per property',                             note: 'Buyer deducts; use Form 26QB; no TAN required',                       group: 'Property' },
+
+  // ── Others ───────────────────────────────────────────────────────────────
+  { code: '194N',      label: '194N — Cash Withdrawal from Bank / Co-op',        rate: 2,    threshold: '₹1 Crore p.a. (₹20L for non-ITR filers in 3 yrs)',   note: '5% above ₹3 Crore for non-filers; check ITR filing status',           group: 'Others' },
+  { code: '194O',      label: '194O — E-commerce Operator (on seller)',           rate: 0.1,  threshold: '₹5,00,000 per year',                                  note: 'Rate reduced from 1% to 0.1% (Finance Act 2025)',                     group: 'Others' },
+  { code: '194Q',      label: '194Q — Purchase of Goods (Buyer > ₹10Cr TO)',     rate: 0.1,  threshold: '₹50 Lakhs per seller per year',                       note: 'Not applicable if TCS under 206C(1H) already deducted',               group: 'Others' },
+  { code: '194R',      label: '194R — Benefits / Perquisites to Business/Prof',  rate: 10,   threshold: '₹20,000 per year',                                    note: 'Covers gifts, free products, travel, hospitality to dealers/agents',  group: 'Others' },
+  { code: '194S',      label: '194S — Transfer of Virtual Digital Asset (VDA)',  rate: 1,    threshold: '₹50,000 (specified persons) / ₹10,000 (others)',      note: 'Crypto, NFT etc.; use Form 26QE if buyer individual/HUF',             group: 'Others' },
+  { code: '206C(1H)',  label: '206C(1H) — TCS on Sale of Goods (Seller)',        rate: 0.1,  threshold: '₹50 Lakhs per buyer per year (seller TO > ₹10Cr)',    note: 'TCS — not TDS; buyer can claim credit in Form 26AS',                  group: 'Others' },
 ]
 
-const GROUPS = ['Salary', 'Interest & Dividends', 'Contractors & Professionals', 'Rent', 'Others'] as const
+const GROUPS = ['Salary', 'Interest & Dividends', 'Contractors & Professionals', 'Rent', 'Property', 'Others'] as const
 
 export default function TDSPage() {
   const [rows, setRows] = useState<TDSRow[]>([])
@@ -80,7 +97,7 @@ export default function TDSPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">TDS Centre</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Track TDS deducted at source — reconcile with 26AS</p>
+          <p className="text-slate-500 text-sm mt-0.5">Rates &amp; thresholds as per Finance Act 2025 / New Income Tax Bill 2025 (FY 2025-26)</p>
         </div>
         <button onClick={() => setShowForm(v => !v)}
           className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg font-medium text-sm">
