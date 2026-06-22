@@ -72,6 +72,8 @@ function UploadTab() {
   const [file, setFile] = useState<File | null>(null)
   const [transactions, setTransactions] = useState<BankTransaction[]>([])
   const [importing, setImporting] = useState(false)
+  const [parsePdfLoading, setParsePdfLoading] = useState(false)
+  const [parsePdfError, setParsePdfError] = useState('')
   const [importResult, setImportResult] = useState<{ count: number } | null>(null)
   const [importError, setImportError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -88,7 +90,7 @@ function UploadTab() {
         setTransactions(parsed)
       })
     }
-    // PDF: show message — server-side processing needed
+    // PDF parsed via server — user clicks "Parse PDF" button
   }, [])
 
   function handleDrop(e: React.DragEvent) {
@@ -176,17 +178,43 @@ function UploadTab() {
         </div>
       )}
 
-      {/* PDF notice */}
-      {isPdf && (
+      {/* PDF parse panel */}
+      {isPdf && transactions.length === 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p className="text-sm font-semibold text-amber-800 mb-1">PDF Processing</p>
-          <p className="text-sm text-amber-700">
-            PDF parsing requires server-side processing. Your file will be sent to the server where
-            transactions will be extracted using OCR/text parsing. In production, click &quot;Upload PDF&quot;
-            to send the file for processing.
+          <p className="text-sm font-semibold text-amber-800 mb-1">PDF Bank Statement</p>
+          <p className="text-sm text-amber-700 mb-3">
+            Your PDF will be parsed on the server — transactions are extracted from the statement text.
+            Works best with text-based PDFs from HDFC, ICICI, SBI, Axis, and Kotak net banking.
           </p>
-          <button className="mt-3 bg-amber-600 hover:bg-amber-500 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors">
-            Upload PDF for Processing
+          {parsePdfError && (
+            <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{parsePdfError}</p>
+          )}
+          <button
+            disabled={parsePdfLoading}
+            onClick={async () => {
+              if (!file) return
+              setParsePdfLoading(true)
+              setParsePdfError('')
+              try {
+                const fd = new FormData()
+                fd.append('file', file)
+                const res = await fetch('/api/bank-recon/parse-pdf', { method: 'POST', body: fd })
+                const data = await res.json()
+                if (!res.ok) throw new Error(data.error || 'Parsing failed')
+                if (data.transactions.length === 0) {
+                  setParsePdfError('No transactions found. Your PDF may be scanned (image-based) — try downloading a text-based statement from net banking.')
+                } else {
+                  setTransactions(data.transactions)
+                }
+              } catch (err: unknown) {
+                setParsePdfError(err instanceof Error ? err.message : 'PDF parsing failed')
+              } finally {
+                setParsePdfLoading(false)
+              }
+            }}
+            className="bg-amber-600 hover:bg-amber-500 disabled:bg-amber-300 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            {parsePdfLoading ? 'Parsing PDF…' : 'Parse PDF & Extract Transactions'}
           </button>
         </div>
       )}
