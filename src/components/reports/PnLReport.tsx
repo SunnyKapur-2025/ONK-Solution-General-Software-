@@ -27,7 +27,7 @@ function SectionRow({ label, note, total, bold, shade }: { label: string; note?:
   return (
     <tr className={shade ?? ''}>
       <td className={`px-6 py-2 text-sm ${bold ? 'font-bold' : ''} text-slate-800`}>{label}</td>
-      <td className="px-2 py-2 text-xs text-slate-400 text-center">{note ? note : ''}</td>
+      <td className="px-2 py-2 text-xs text-slate-400 text-center">{note ?? ''}</td>
       <td className={`pr-6 py-2 text-right font-mono text-sm whitespace-nowrap ${bold ? 'font-bold' : ''} text-slate-800`}>
         {formatCurrency(total)}
       </td>
@@ -35,12 +35,10 @@ function SectionRow({ label, note, total, bold, shade }: { label: string; note?:
   )
 }
 
-function SectionHeader({ roman, label }: { roman: string; label: string }) {
+function SectionHeader({ label }: { label: string }) {
   return (
     <tr className="bg-slate-50 border-t border-slate-200">
-      <td className="px-6 py-2 text-xs font-semibold text-slate-600" colSpan={3}>
-        <span className="text-slate-400 mr-2">{roman}</span>{label}
-      </td>
+      <td className="px-6 py-2 text-xs font-semibold text-slate-600" colSpan={3}>{label}</td>
     </tr>
   )
 }
@@ -129,20 +127,20 @@ export default function PnLReportPage() {
             </thead>
             <tbody>
               {/* I — Revenue from operations */}
-              <SectionHeader roman="I" label="Revenue from operations" />
+              <SectionHeader label="I  Revenue from operations" />
               <AccountRows accounts={report.revenueFromOperations ?? report.income.filter(a => !/other_income|interest|dividend/.test(a.subType))} />
               <SectionRow label="Revenue from operations" note={19} total={report.totalRevenue ?? report.totalIncome} />
 
               {/* II — Other income */}
-              <SectionHeader roman="II" label="Other income" />
+              <SectionHeader label="II  Other income" />
               <AccountRows accounts={report.otherIncome ?? []} emptyMsg="No other income" />
               <SectionRow label="Other income" note={20} total={report.totalOtherIncome ?? 0} />
 
               {/* III — Total income */}
-              <SectionRow roman="III" label="Total income (I + II)" total={report.totalIncome} bold shade="bg-blue-50" />
+              <SectionRow label="III  Total income (I + II)" total={report.totalIncome} bold shade="bg-blue-50" />
 
               {/* IV — Expenses */}
-              <SectionHeader roman="IV" label="Expenses" />
+              <SectionHeader label="IV  Expenses" />
 
               {(report.costOfGoodsSold?.length > 0 || report.directExpenses.length > 0) && (
                 <>
@@ -198,7 +196,7 @@ export default function PnLReportPage() {
               </tr>
 
               {/* VI — Exceptional items */}
-              <SectionRow roman="VI" label="Exceptional items (if any)" total={0} shade="bg-slate-50/50" />
+              <SectionRow label="VI  Exceptional items (if any)" total={0} shade="bg-slate-50/50" />
 
               {/* IX — Profit before tax (simplified — skipping VIII extraordinary for brevity) */}
               <tr className="bg-slate-50 border-t border-slate-200">
