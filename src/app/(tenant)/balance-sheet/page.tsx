@@ -1,6 +1,9 @@
-'use client'
-import PnLReport from '@/components/reports/PnLReport'
-
 export default function BalanceSheetPage() {
-  return <PnLReport type="balance-sheet" />
+  return (
+    <div className="max-w-2xl mx-auto py-12 px-6 text-center text-slate-400">
+      <p className="text-4xl mb-4">📊</p>
+      <p className="text-lg font-medium text-slate-600">Balance Sheet</p>
+      <p className="text-sm mt-2">Balance sheet report — coming soon.</p>
+    </div>
+  )
 }

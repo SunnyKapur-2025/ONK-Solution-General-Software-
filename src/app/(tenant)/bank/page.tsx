@@ -1,14 +1,9 @@
-'use client'
-import BankReconciliation from '@/components/bank/BankReconciliation'
-
 export default function BankPage() {
   return (
-    <BankReconciliation
-      bankAccountId=""
-      bankAccountName="Bank Account"
-      onImport={async () => {}}
-      onReconcile={async () => {}}
-      onCreateVoucher={async () => {}}
-    />
+    <div className="max-w-2xl mx-auto py-12 px-6 text-center text-slate-400">
+      <p className="text-4xl mb-4">🏦</p>
+      <p className="text-lg font-medium text-slate-600">Bank Reconciliation</p>
+      <p className="text-sm mt-2">Bank reconciliation module — coming soon.</p>
+    </div>
   )
 }

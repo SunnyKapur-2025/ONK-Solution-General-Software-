@@ -151,6 +151,30 @@ export default function AppShell({ tenantName, userName, userRole, enabledModule
             <span className="text-base leading-none w-5 text-center">📒</span>
             <span>Day Book</span>
           </Link>
+
+          {/* Divider */}
+          <div className="mx-4 my-2 border-t border-slate-800" />
+
+          {/* Utility links — always visible */}
+          {[
+            { href: '/ledger-create', icon: '📝', label: 'Ledger Creation' },
+            { href: '/settings', icon: '⚙️', label: 'Settings' },
+            { href: '/users', icon: '👤', label: 'Users & Rights' },
+            { href: '/help', icon: '❓', label: 'Help & Support' },
+          ].map(({ href, icon, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center gap-2.5 mx-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                pathname === href
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <span className="text-base leading-none w-5 text-center">{icon}</span>
+              <span>{label}</span>
+            </Link>
+          ))}
         </nav>
 
         {/* Mode toggle + User footer */}
