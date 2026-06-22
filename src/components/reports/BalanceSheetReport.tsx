@@ -70,7 +70,7 @@ export default function BalanceSheetReportView({ report }: Props) {
       <div className="text-center mb-4 print:mb-2">
         <h2 className="text-lg font-bold text-slate-900 uppercase tracking-wide">Balance Sheet</h2>
         <p className="text-sm text-slate-500">as at {formattedDate}</p>
-        <p className="text-xs text-slate-400 mt-0.5">(As per Schedule III of Companies Act, 2013)</p>
+        <p className="text-xs text-slate-400 mt-0.5">NCE Format — ICAI Guidance Note on Financial Statements for Non-Corporate Entities</p>
       </div>
 
       {/* Balance warning */}

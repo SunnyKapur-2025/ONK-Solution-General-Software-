@@ -19,13 +19,33 @@ export interface AccountBalance {
 export interface PnLReport {
   fromDate: string
   toDate: string
+  // NCE Section I — Revenue from operations
+  revenueFromOperations: AccountBalance[]
+  // NCE Section II — Other income
+  otherIncome: AccountBalance[]
+  // NCE Section IV sub-categories
+  costOfGoodsSold: AccountBalance[]
+  employeeBenefits: AccountBalance[]
+  financeCosts: AccountBalance[]
+  depreciation: AccountBalance[]
+  otherExpenses: AccountBalance[]
+  // Totals
+  totalRevenue: number
+  totalOtherIncome: number
+  totalIncome: number
+  totalCogs: number
+  totalEmployeeBenefits: number
+  totalFinanceCosts: number
+  totalDepreciation: number
+  totalOtherExpenses: number
+  totalExpenses: number
+  profitBeforeTax: number
+  netProfit: number
+  // Legacy fields (kept for compatibility)
   income: AccountBalance[]
   directExpenses: AccountBalance[]
   indirectExpenses: AccountBalance[]
   grossProfit: number
-  netProfit: number
-  totalIncome: number
-  totalExpenses: number
 }
 
 // ── Schedule III — Companies Act 2013 ────────────────────────────────────────
@@ -76,10 +96,10 @@ function fallbackMapping(type: string, subType: string): { side: 'equity_liabili
   return null
 }
 
-// Line item labels for display
+// Line item labels for display (NCE — Non-Corporate Entity format per ICAI Guidance Note)
 export const SCHEDULE3_LABELS: Record<string, string> = {
-  'a_share_capital':      '(a) Share Capital',
-  'b_reserves_surplus':   '(b) Reserves and Surplus',
+  'a_share_capital':      "(a) Owner's Capital Account",
+  'b_reserves_surplus':   '(b) Reserves and Surplus / Undistributed Surplus',
   'a_lt_borrowings':      '(a) Long-term Borrowings',
   'b_deferred_tax':       '(b) Deferred Tax Liabilities (Net)',
   'c_other_lt_liabilities': '(c) Other Long-term Liabilities',
@@ -149,11 +169,28 @@ function netBalance(debit: number, credit: number, type: string): number {
   return normalBalance(type) === 'dr' ? debit - credit : credit - debit
 }
 
+// NCE expense classification by subType
+function classifyExpense(subType: string): 'cogs' | 'employee' | 'finance' | 'depreciation' | 'other' {
+  if (/direct_expense|cost_of_goods|cogs|material/.test(subType)) return 'cogs'
+  if (/salary|employee|payroll|staff|wages/.test(subType)) return 'employee'
+  if (/finance|interest|bank_charge/.test(subType)) return 'finance'
+  if (/depreciation|amortiz/.test(subType)) return 'depreciation'
+  return 'other'
+}
+
 export function computePnL(
   balances: Array<{ accountId: string; accountCode: string; accountName: string; type: string; subType: string; debitTotal: number; creditTotal: number }>,
   fromDate: string,
   toDate: string
 ): PnLReport {
+  const revenueFromOperations: AccountBalance[] = []
+  const otherIncome: AccountBalance[] = []
+  const costOfGoodsSold: AccountBalance[] = []
+  const employeeBenefits: AccountBalance[] = []
+  const financeCosts: AccountBalance[] = []
+  const depreciation: AccountBalance[] = []
+  const otherExpenses: AccountBalance[] = []
+  // Legacy
   const income: AccountBalance[] = []
   const directExpenses: AccountBalance[] = []
   const indirectExpenses: AccountBalance[] = []
@@ -164,28 +201,62 @@ export function computePnL(
 
     if (b.type === 'income') {
       income.push(entry)
+      if (/other_income|interest|dividend|gain/.test(b.subType)) otherIncome.push(entry)
+      else revenueFromOperations.push(entry)
     } else if (b.type === 'expense') {
       if (b.subType === 'direct_expense') directExpenses.push(entry)
       else indirectExpenses.push(entry)
+
+      const cls = classifyExpense(b.subType)
+      if (cls === 'cogs') costOfGoodsSold.push(entry)
+      else if (cls === 'employee') employeeBenefits.push(entry)
+      else if (cls === 'finance') financeCosts.push(entry)
+      else if (cls === 'depreciation') depreciation.push(entry)
+      else otherExpenses.push(entry)
     }
   }
 
-  const totalIncome = income.reduce((s, a) => s + a.balance, 0)
+  const totalRevenue = revenueFromOperations.reduce((s, a) => s + a.balance, 0)
+  const totalOtherIncome = otherIncome.reduce((s, a) => s + a.balance, 0)
+  const totalIncome = totalRevenue + totalOtherIncome
+  const totalCogs = costOfGoodsSold.reduce((s, a) => s + a.balance, 0)
+  const totalEmployeeBenefits = employeeBenefits.reduce((s, a) => s + a.balance, 0)
+  const totalFinanceCosts = financeCosts.reduce((s, a) => s + a.balance, 0)
+  const totalDepreciation = depreciation.reduce((s, a) => s + a.balance, 0)
+  const totalOtherExpenses = otherExpenses.reduce((s, a) => s + a.balance, 0)
+  const totalExpenses = totalCogs + totalEmployeeBenefits + totalFinanceCosts + totalDepreciation + totalOtherExpenses
+  const profitBeforeTax = totalIncome - totalExpenses
+  // Legacy
   const totalDirect = directExpenses.reduce((s, a) => s + a.balance, 0)
   const totalIndirect = indirectExpenses.reduce((s, a) => s + a.balance, 0)
   const grossProfit = totalIncome - totalDirect
-  const netProfit = grossProfit - totalIndirect
 
   return {
     fromDate,
     toDate,
+    revenueFromOperations,
+    otherIncome,
+    costOfGoodsSold,
+    employeeBenefits,
+    financeCosts,
+    depreciation,
+    otherExpenses,
+    totalRevenue,
+    totalOtherIncome,
+    totalIncome,
+    totalCogs,
+    totalEmployeeBenefits,
+    totalFinanceCosts,
+    totalDepreciation,
+    totalOtherExpenses,
+    totalExpenses,
+    profitBeforeTax,
+    netProfit: profitBeforeTax,
+    // Legacy
     income,
     directExpenses,
     indirectExpenses,
     grossProfit,
-    netProfit,
-    totalIncome,
-    totalExpenses: totalDirect + totalIndirect,
   }
 }
 
@@ -253,9 +324,9 @@ export function computeBalanceSheet(
     elI.get('b_reserves_surplus')!.push(reEntry)
   }
 
-  // Build equity & liabilities parts
+  // Build equity & liabilities parts (NCE — Non-Corporate Entity headings)
   const elParts: ScheduleIIIPart[] = [
-    buildPart('I', "Shareholders' Funds", buckets.equity_liabilities['I']),
+    buildPart('I', "Owner's Funds", buckets.equity_liabilities['I']),
     buildPart('II', 'Non-Current Liabilities', buckets.equity_liabilities['II']),
     buildPart('III', 'Current Liabilities', buckets.equity_liabilities['III']),
   ]
