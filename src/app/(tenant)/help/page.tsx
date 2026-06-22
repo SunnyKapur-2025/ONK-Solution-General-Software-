@@ -5,49 +5,61 @@ import { useState } from 'react'
 const FAQS = [
   {
     q: 'How do I add a new ledger account?',
-    a: 'Go to Accounts in the sidebar, click "New Account", fill in the account name, type (Asset/Liability/Income/Expense), and code. Save to create it.',
+    a: 'Go to Ledger Creation in the sidebar, choose the Tally-compatible group (e.g. Sundry Debtors, Bank Accounts), fill in the name and opening balance. Save to create it.',
   },
   {
     q: 'How do I record a sale with GST?',
-    a: 'Use the Sales module or create an invoice from the Invoices page. Select the GST rate and whether it is intra-state (CGST+SGST) or inter-state (IGST). The system auto-posts the journal entry.',
+    a: 'Use the Sales module or create an invoice from the Invoices page. Select the GST rate and whether it is intra-state (CGST+SGST) or inter-state (IGST). The system auto-posts the balanced journal entry.',
   },
   {
     q: 'Can I export data to Tally or Busy?',
-    a: 'Yes — go to Reports → Export to Tally/Busy. You can export journal entries in XML format compatible with Tally Prime and Busy Accounting.',
+    a: 'Yes — go to "Export to Tally / Busy" from the top bar. You can export both journal vouchers (XML) and ledger masters (Chart of Accounts) for Tally Prime or Busy Accounting.',
   },
   {
-    q: 'How do I view all transactions for a particular party?',
-    a: 'Use the Day Book report and filter by party name, or go to the Debtors/Creditors Aging report to see outstanding balances per party.',
+    q: 'How do I view all transactions for a party?',
+    a: 'Use the Day Book and filter by party name, or check the Debtors/Creditors Aging report for outstanding balances per party.',
   },
   {
-    q: 'What does "Power Mode" do?',
-    a: 'Power Mode (Ctrl+M) enables keyboard-first data entry similar to traditional accounting software. Use F4–F9 to open voucher types and Tab/Enter to navigate fields quickly.',
+    q: 'What does Power Mode do?',
+    a: 'Power Mode (Ctrl+M) enables keyboard-first Tally-style data entry. Use F4–F9 to switch voucher types and Tab/Enter to navigate fields. Ctrl+A saves/accepts the entry.',
   },
   {
     q: 'How is the financial year determined?',
-    a: 'The system uses the Indian financial year (April 1 – March 31). All reports default to the current FY. You can change the date range manually in any report.',
+    a: 'The system uses the Indian financial year (April 1 – March 31). All reports default to the current FY. You can change the date range manually on any report.',
+  },
+  {
+    q: 'How do I collapse the sidebar?',
+    a: 'Click the « / » arrow button at the top-right of the sidebar, or press Ctrl+\\ to toggle it. The sidebar collapses to an icon-only strip for more screen space.',
+  },
+  {
+    q: 'What TDS sections are available?',
+    a: 'The TDS Centre covers all sections under the Finance Act 2025 / New Income Tax Bill 2025, including the new 194T (partner payments), 194S (VDA/crypto), and updated rates for 194D, 194H, 194I, 194J, and 194O.',
   },
 ]
 
 const SHORTCUTS = [
-  { key: 'Ctrl+M', action: 'Toggle Power Mode' },
-  { key: 'Ctrl+N', action: 'New Voucher' },
-  { key: 'F4', action: 'Open Sales Voucher' },
-  { key: 'F5', action: 'Open Purchase Voucher' },
-  { key: 'F6', action: 'Open Receipt Voucher' },
-  { key: 'F7', action: 'Open Payment Voucher' },
-  { key: 'F8', action: 'Open Journal Voucher' },
-  { key: 'F9', action: 'Open Contra Voucher' },
-  { key: 'Tab / Enter', action: 'Navigate between fields' },
-  { key: 'Ctrl+A', action: 'Save / Accept entry' },
+  { key: 'Ctrl+M',   action: 'Toggle Power Mode (keyboard-first entry)' },
+  { key: 'Ctrl+N',   action: 'Open new voucher' },
+  { key: 'Ctrl+\\',  action: 'Collapse / expand sidebar' },
+  { key: 'Alt+1…9',  action: 'Jump to 1st–9th module tab' },
+  { key: 'F4',       action: 'Switch to Contra voucher' },
+  { key: 'F5',       action: 'Switch to Payment voucher' },
+  { key: 'F6',       action: 'Switch to Receipt voucher' },
+  { key: 'F7',       action: 'Switch to Journal voucher' },
+  { key: 'F8',       action: 'Switch to Sales voucher' },
+  { key: 'F9',       action: 'Switch to Purchase voucher' },
+  { key: 'Tab / Enter', action: 'Move between fields in Power Mode' },
+  { key: 'Ctrl+A',   action: 'Save / Accept entry' },
+  { key: 'Escape',   action: 'Cancel / reset current entry' },
 ]
 
 const STEPS = [
-  { step: 1, title: 'Create Ledger Accounts', desc: 'Set up your chart of accounts — assets, liabilities, income, and expense heads.' },
-  { step: 2, title: 'Add Parties', desc: 'Add customers and suppliers as party accounts under Debtors or Creditors.' },
-  { step: 3, title: 'Record Your First Sale', desc: 'Go to Invoices, click "New Invoice", fill in customer, amount, GST, and submit.' },
-  { step: 4, title: 'View Day Book', desc: 'Go to Reports → Day Book to see all transactions posted for a date range.' },
-  { step: 5, title: 'Export to Tally', desc: 'Go to Reports → Export to Tally/Busy to export entries for your CA or tax filing.' },
+  { step: 1, title: 'Create Ledger Accounts', desc: 'Go to Ledger Creation → choose the Tally group (e.g. Bank Accounts, Sundry Debtors) → save.' },
+  { step: 2, title: 'Add Parties', desc: 'Add customers and suppliers under Sundry Debtors or Sundry Creditors group.' },
+  { step: 3, title: 'Record Your First Sale', desc: 'Go to Invoices → New Invoice → fill in customer, line items, GST, and submit.' },
+  { step: 4, title: 'View Day Book', desc: 'Click Day Book in the sidebar to see all posted transactions for a date range.' },
+  { step: 5, title: 'Personalise Your Invoice', desc: 'Go to Settings → Invoice section to upload your logo, seal, signature, and bank details.' },
+  { step: 6, title: 'Export to Tally / Busy', desc: 'Click "Export to Tally / Busy" in the top bar. Export vouchers or ledger masters in one click.' },
 ]
 
 export default function HelpPage() {
@@ -64,7 +76,7 @@ export default function HelpPage() {
       <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 bg-blue-50">
           <h2 className="font-semibold text-blue-900">Getting Started</h2>
-          <p className="text-xs text-blue-700 mt-0.5">Follow these 5 steps to be up and running</p>
+          <p className="text-xs text-blue-700 mt-0.5">Follow these steps to be up and running</p>
         </div>
         <div className="divide-y divide-slate-100">
           {STEPS.map(({ step, title, desc }) => (
@@ -85,7 +97,7 @@ export default function HelpPage() {
       <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
           <h2 className="font-semibold text-slate-800">Keyboard Shortcuts</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Speed up your data entry</p>
+          <p className="text-xs text-slate-500 mt-0.5">Speed up your data entry — no mouse needed</p>
         </div>
         <div className="grid grid-cols-2 gap-px bg-slate-100">
           {SHORTCUTS.map(({ key, action }) => (
@@ -99,26 +111,6 @@ export default function HelpPage() {
         </div>
       </section>
 
-      {/* Video Tutorials */}
-      <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
-          <h2 className="font-semibold text-slate-800">Video Tutorials</h2>
-        </div>
-        <div className="grid grid-cols-3 gap-4 p-6">
-          {['Getting Started', 'GST Filing', 'Tally Export'].map((title) => (
-            <div key={title} className="bg-slate-100 rounded-xl aspect-video flex flex-col items-center justify-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-slate-300 flex items-center justify-center">
-                <svg className="w-4 h-4 text-slate-500 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-              <p className="text-xs text-slate-500 font-medium">{title}</p>
-              <p className="text-xs text-slate-400">Coming soon</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Contact Support */}
       <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 bg-green-50">
@@ -126,20 +118,15 @@ export default function HelpPage() {
         </div>
         <div className="p-6 grid grid-cols-3 gap-4">
           <div className="bg-slate-50 rounded-xl p-4">
-            <p className="text-xs font-medium text-slate-500 mb-1">Email</p>
-            <a href="mailto:support@onksolutions.in" className="text-sm text-blue-700 font-medium hover:underline">
-              support@onksolutions.in
+            <p className="text-xs font-medium text-slate-500 mb-1">Phone / WhatsApp</p>
+            <a href="tel:+919910429943" className="text-sm text-blue-700 font-medium hover:underline">
+              +91 99104 29943
             </a>
           </div>
           <div className="bg-slate-50 rounded-xl p-4">
-            <p className="text-xs font-medium text-slate-500 mb-1">WhatsApp</p>
-            <a
-              href="https://wa.me/91XXXXXXXXXX"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-green-700 font-medium hover:underline"
-            >
-              Message us on WhatsApp
+            <p className="text-xs font-medium text-slate-500 mb-1">Email</p>
+            <a href="mailto:sunnyk28@hotmail.com" className="text-sm text-blue-700 font-medium hover:underline">
+              sunnyk28@hotmail.com
             </a>
           </div>
           <div className="bg-slate-50 rounded-xl p-4">
@@ -171,6 +158,25 @@ export default function HelpPage() {
               )}
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* About / Credits */}
+      <section className="bg-slate-900 rounded-xl overflow-hidden">
+        <div className="px-6 py-5 flex items-center justify-between">
+          <div>
+            <p className="text-white font-bold text-base">
+              <span className="text-blue-400">ONK</span> Solutions — General Software
+            </p>
+            <p className="text-slate-400 text-xs mt-1">Cloud accounting for the Indian service industry</p>
+          </div>
+          <div className="text-right">
+            <p className="text-slate-400 text-xs">Designed &amp; Developed by</p>
+            <p className="text-white font-semibold text-sm mt-0.5">Sunny Kapoor</p>
+            <a href="tel:+919910429943" className="text-blue-400 text-xs hover:text-blue-300">+91 99104 29943</a>
+            <span className="text-slate-600 text-xs mx-1">·</span>
+            <a href="mailto:sunnyk28@hotmail.com" className="text-blue-400 text-xs hover:text-blue-300">sunnyk28@hotmail.com</a>
+          </div>
         </div>
       </section>
     </div>

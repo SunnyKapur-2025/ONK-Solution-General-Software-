@@ -285,6 +285,7 @@ export default function AppShell({ tenantName, userName, userRole, enabledModule
             <>
               <p className="text-slate-300 text-xs font-medium truncate">{userName}</p>
               <p className="text-slate-500 text-xs capitalize">{userRole}</p>
+              <p className="text-slate-700 text-[10px] mt-1">by Sunny Kapoor</p>
             </>
           )}
 

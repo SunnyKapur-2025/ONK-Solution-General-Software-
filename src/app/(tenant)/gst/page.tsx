@@ -61,9 +61,59 @@ export default function GstPage() {
           <h1 className="text-2xl font-bold text-slate-900">GST Centre</h1>
           <p className="text-slate-500 text-sm mt-0.5">Reconciliation &amp; Summary — file returns directly on GST portal</p>
         </div>
-        <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg font-medium">
-          For reconciliation only
-        </span>
+        <div className="flex gap-2 flex-wrap justify-end">
+          <a
+            href="https://www.gst.gov.in/auth/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
+          >
+            <span>↗</span> GST Portal Login
+          </a>
+          <a
+            href="https://services.gst.gov.in/services/auth/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg font-medium transition-colors"
+          >
+            ↗ File GSTR-1
+          </a>
+          <a
+            href="https://services.gst.gov.in/services/auth/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg font-medium transition-colors"
+          >
+            ↗ File GSTR-3B
+          </a>
+        </div>
+      </div>
+
+      {/* GST Portal Quick Links */}
+      <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
+        <p className="text-xs font-semibold text-orange-800 mb-3 uppercase tracking-wide">GST Portal — Quick Links</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { label: 'GSTR-1 (Outward Supplies)',   href: 'https://services.gst.gov.in/services/auth/login', desc: 'Monthly/quarterly sales return' },
+            { label: 'GSTR-3B (Monthly Summary)',    href: 'https://services.gst.gov.in/services/auth/login', desc: 'Summary return + tax payment' },
+            { label: 'GSTR-2B (ITC Statement)',      href: 'https://services.gst.gov.in/services/auth/login', desc: 'Auto-drafted input tax credit' },
+            { label: 'E-Way Bill Portal',            href: 'https://ewaybillgst.gov.in/login.aspx',           desc: 'Generate & verify e-way bills' },
+          ].map(({ label, href, desc }) => (
+            <a
+              key={label}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col gap-0.5 bg-white border border-orange-100 rounded-lg px-3 py-2.5 hover:border-orange-300 hover:shadow-sm transition-all group"
+            >
+              <span className="text-xs font-semibold text-orange-700 group-hover:text-orange-900">{label} ↗</span>
+              <span className="text-[11px] text-slate-500">{desc}</span>
+            </a>
+          ))}
+        </div>
+        <p className="text-[11px] text-orange-600 mt-3">
+          Note: GST portal requires your GSTIN login. The figures below are from your books — reconcile with GSTR-2B before filing.
+        </p>
       </div>
 
       {error && <p className="text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm">{error}</p>}
