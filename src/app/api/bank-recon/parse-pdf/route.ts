@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 
-interface BankTransaction {
+export interface BankTransaction {
   date: string
   description: string
   debit: number
@@ -11,39 +11,64 @@ interface BankTransaction {
   balance: number
 }
 
-// Parse an Indian-format amount string like "INR 82,588.00" or "82,588.00"
 function parseAmount(s: string): number {
   if (!s) return 0
-  return parseFloat(s.replace(/INR\s*/gi, '').replace(/,/g, '').trim()) || 0
+  return parseFloat(s.replace(/INR\s*/gi, '').replace(/[,\s]/g, '').trim()) || 0
 }
 
-// Indian Bank / most Indian bank PDF text layout:
-// Each transaction block looks like:
-//   07 Apr 2025  TRANSFER FROM ...  -  INR 82,588.00  INR 82,725.38
-//
-// After pdf-parse, these columns may be on the same line or spread over
-// a few lines. We group lines by detecting the start of a new date.
+// ── Date normalizers ──────────────────────────────────────────────────────────
+const MON_MAP: Record<string, string> = {
+  jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06',
+  jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12',
+}
 
-// Matches: "07 Apr 2025" style dates
-const DATE_DDMONYYYY = /^\d{2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}/i
-// Also matches: "07/04/2025", "07-04-2025"
-const DATE_NUMERIC   = /^\d{2}[\/\-]\d{2}[\/\-]\d{2,4}/
+function normalizeDate(raw: string): string {
+  raw = raw.trim()
+  // DD Mon YYYY  →  YYYY-MM-DD
+  const m1 = raw.match(/^(\d{1,2})[\/\-\s]+([A-Za-z]{3})[\/\-\s]+(\d{4})/)
+  if (m1) return `${m1[3]}-${MON_MAP[m1[2].toLowerCase()] ?? '01'}-${m1[1].padStart(2,'0')}`
+  // DD/MM/YYYY or DD-MM-YYYY
+  const m2 = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/)
+  if (m2) {
+    const yr = m2[3].length === 2 ? '20' + m2[3] : m2[3]
+    return `${yr}-${m2[2].padStart(2,'0')}-${m2[1].padStart(2,'0')}`
+  }
+  return raw
+}
+
+// ── Bank format detection ─────────────────────────────────────────────────────
+function detectBank(text: string): string {
+  const t = text.toLowerCase()
+  if (t.includes('hdfc bank')) return 'hdfc'
+  if (t.includes('icici bank')) return 'icici'
+  if (t.includes('state bank of india') || t.includes('sbi')) return 'sbi'
+  if (t.includes('axis bank')) return 'axis'
+  if (t.includes('kotak mahindra')) return 'kotak'
+  if (t.includes('punjab national bank') || t.includes('pnb')) return 'pnb'
+  if (t.includes('bank of baroda') || t.includes('bob')) return 'bob'
+  if (t.includes('canara bank')) return 'canara'
+  if (t.includes('indian bank') || t.includes('idib')) return 'indian_bank'
+  return 'generic'
+}
+
+// ── Generic block-based parser (works for most Indian banks) ─────────────────
+const DATE_DDMONYYYY = /^\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}/i
+const DATE_NUMERIC   = /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/
+const AMOUNT_RE      = /(?:INR\s*|Rs\.?\s*)?[\d,]+\.\d{2}/gi
 
 function isDateLine(line: string): boolean {
   return DATE_DDMONYYYY.test(line) || DATE_NUMERIC.test(line)
 }
 
-// Extract all INR-prefixed or bare decimal amounts from a string
 function extractAmounts(text: string): number[] {
-  const matches = text.match(/INR\s*[\d,]+\.\d{2}/gi) || text.match(/[\d,]+\.\d{2}/g) || []
+  const matches = text.match(AMOUNT_RE) || []
   return matches.map(parseAmount).filter(v => v > 0)
 }
 
-function parsePdfText(text: string): BankTransaction[] {
+function parseGeneric(text: string): BankTransaction[] {
   const rawLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
   const transactions: BankTransaction[] = []
 
-  // Group raw lines into blocks — each block starts with a date
   const blocks: string[][] = []
   let current: string[] = []
 
@@ -60,44 +85,29 @@ function parsePdfText(text: string): BankTransaction[] {
   for (const block of blocks) {
     const fullText = block.join(' ')
 
-    // Extract date from first line
-    const dateMatch = block[0].match(/^\d{2}\s+[A-Za-z]{3}\s+\d{4}|\d{2}[\/\-]\d{2}[\/\-]\d{2,4}/)
+    const dateMatch = block[0].match(/\d{1,2}\s+[A-Za-z]{3}\s+\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/)
     if (!dateMatch) continue
-    const date = dateMatch[0]
+    const date = normalizeDate(dateMatch[0])
 
-    // Get all amounts in this block
     const amounts = extractAmounts(fullText)
     if (amounts.length === 0) continue
 
-    // Build description: text with date and amounts stripped
     const desc = fullText
-      .replace(/\d{2}\s+[A-Za-z]{3}\s+\d{4}/gi, '')
-      .replace(/INR\s*[\d,]+\.\d{2}/gi, '')
+      .replace(/\d{1,2}\s+[A-Za-z]{3}\s+\d{4}/gi, '')
+      .replace(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/g, '')
+      .replace(/(?:INR\s*|Rs\.?\s*)[\d,]+\.\d{2}/gi, '')
       .replace(/[\d,]+\.\d{2}/g, '')
       .replace(/\s*-\s*/g, ' ')
       .replace(/\s{2,}/g, ' ')
       .trim()
       .slice(0, 120)
 
-    // Determine debit/credit:
-    // Indian Bank format: Debits | Credits | Balance
-    // Empty column is shown as "-" — so amounts tell us the count
-    //
-    // If the block contains both "INR X" in Debits column and "-" for Credits
-    // pdf-parse will give us 2 numbers (debit amount + balance).
-    // If both are present we get 3 numbers.
-    // Use the dash markers to disambiguate.
+    const isDebitEmpty  = fullText.match(/\s-\s+(?:INR\s*)?[\d,]+\.\d{2}\s+(?:INR\s*)?[\d,]/i) !== null
+    const isCreditEmpty = fullText.match(/(?:INR\s*)?[\d,]+\.\d{2}\s+-\s+(?:INR\s*)?[\d,]/i) !== null
 
     let debit = 0, credit = 0, balance = 0
 
-    // Check for explicit "- INR" or "INR ... -" pattern (credit or debit empty)
-    const isDebitEmpty  = /^\s*-\s+INR/i.test(block[0].replace(/.*?(?:\d{4})/,'')) ||
-                          fullText.match(/\s-\s+INR\s*[\d,]+\.\d{2}\s+INR/i) !== null
-    const isCreditEmpty = fullText.match(/INR\s*[\d,]+\.\d{2}\s+-\s+INR/i) !== null ||
-                          fullText.match(/INR\s*[\d,]+\.\d{2}\s*-\s*INR/i) !== null
-
     if (amounts.length >= 3) {
-      // Both debit and credit present
       debit = amounts[0]; credit = amounts[1]; balance = amounts[2]
     } else if (amounts.length === 2) {
       balance = amounts[1]
@@ -107,9 +117,9 @@ function parsePdfText(text: string): BankTransaction[] {
       balance = amounts[0]
     }
 
-    // Secondary heuristic: "TRANSFER FROM" / "NEFT" / "UPI ... received" → credit
+    // Keyword-based heuristic
     if (debit === 0 && credit === 0 && amounts.length > 0) {
-      if (/TRANSFER FROM|NEFT.*CREDIT|RTGS.*CREDIT|UPI.*CREDIT|RECEIPT/i.test(fullText)) {
+      if (/TRANSFER FROM|NEFT.*(?:CR|CREDIT)|RTGS.*(?:CR|CREDIT)|UPI.*(?:CR|CREDIT|RCV|RECEIVED)|RECEIPT|REFUND|INT PAID|BY TRANSFER|CR INTEREST/i.test(fullText)) {
         credit = amounts[0]
       } else {
         debit = amounts[0]
@@ -117,11 +127,74 @@ function parsePdfText(text: string): BankTransaction[] {
     }
 
     if (debit === 0 && credit === 0) continue
-
     transactions.push({ date, description: desc || 'Transaction', debit, credit, balance })
   }
 
   return transactions
+}
+
+// ── Table-style parser for HDFC / Axis / Kotak / SBI PDF text ────────────────
+// These banks produce cleaner columnar text. Each row is a single line like:
+//   03/06/2025  NEFT CR-123456-...-Client  50000.00  -  1234567.00
+// Columns: Date | Description | Debit | Credit | Balance
+function parseTabular(text: string): BankTransaction[] {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+  const transactions: BankTransaction[] = []
+
+  for (const line of lines) {
+    if (!isDateLine(line)) continue
+    const amounts = extractAmounts(line)
+    if (amounts.length < 2) continue
+
+    const dateMatch = line.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3}\s+\d{4}/)
+    if (!dateMatch) continue
+
+    const date = normalizeDate(dateMatch[0])
+    const balance = amounts[amounts.length - 1]
+
+    const isCreditLine = /\bCR\b|CREDIT|RECEIVED|REFUND|DEPOSIT|SALARY CREDIT|NEFT CR|IMPS CR|UPI CR/i.test(line)
+
+    let debit = 0, credit = 0
+
+    if (amounts.length >= 3) {
+      debit = amounts[0]; credit = amounts[1]
+    } else if (amounts.length === 2) {
+      if (isCreditLine) credit = amounts[0]
+      else debit = amounts[0]
+    }
+
+    const desc = line
+      .replace(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/g, '')
+      .replace(/\d{1,2}\s+[A-Za-z]{3}\s+\d{4}/gi, '')
+      .replace(/(?:INR\s*|Rs\.?\s*)[\d,]+\.\d{2}/gi, '')
+      .replace(/[\d,]+\.\d{2}/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .slice(0, 120)
+
+    if (debit === 0 && credit === 0) continue
+    transactions.push({ date, description: desc || 'Transaction', debit, credit, balance })
+  }
+
+  return transactions
+}
+
+function parsePdfText(text: string): BankTransaction[] {
+  const bank = detectBank(text)
+
+  let results: BankTransaction[] = []
+
+  // Try block parser first (works for Indian Bank, PNB, BoB, Canara)
+  results = parseGeneric(text)
+
+  // If block parser found very few items, try tabular (HDFC, ICICI, SBI, Axis, Kotak)
+  if (results.length < 2) {
+    const tabular = parseTabular(text)
+    if (tabular.length > results.length) results = tabular
+  }
+
+  void bank // used implicitly via text detection
+  return results
 }
 
 export async function POST(req: NextRequest) {
@@ -149,7 +222,7 @@ export async function POST(req: NextRequest) {
       const msg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr)
       if (msg.includes('DOMMatrix') || msg.includes('canvas') || msg.includes('ENOENT')) {
         return NextResponse.json({
-          error: 'PDF text extraction failed on this server environment. Please download your bank statement as CSV from net banking and upload that instead.',
+          error: 'PDF text extraction failed on this server. Please download your bank statement as CSV from net banking instead.',
           transactions: [],
         })
       }
@@ -157,10 +230,12 @@ export async function POST(req: NextRequest) {
     }
 
     const transactions = parsePdfText(pdfText)
+    const bank = detectBank(pdfText)
 
     return NextResponse.json({
       transactions,
       pageCount,
+      bank,
       rawPreview: pdfText.slice(0, 300),
     })
   } catch (err: unknown) {
