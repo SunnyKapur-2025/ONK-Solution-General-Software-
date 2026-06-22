@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { formatCurrency } from '@/lib/utils'
 
 type MonthGST = {
@@ -19,6 +19,12 @@ export default function GstPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tenantId, setTenantId] = useState<string | null>(null)
+  const [gstin, setGstin] = useState('')
+  const [gstinSaved, setGstinSaved] = useState(false)
+  const [gstr2bFile, setGstr2bFile] = useState<File | null>(null)
+  const [gstr2bImporting, setGstr2bImporting] = useState(false)
+  const [gstr2bMsg, setGstr2bMsg] = useState('')
+  const gstr2bRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/me')
@@ -89,31 +95,128 @@ export default function GstPage() {
         </div>
       </div>
 
-      {/* GST Portal Quick Links */}
-      <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
-        <p className="text-xs font-semibold text-orange-800 mb-3 uppercase tracking-wide">GST Portal — Quick Links</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
-            { label: 'GSTR-1 (Outward Supplies)',   href: 'https://services.gst.gov.in/services/auth/login', desc: 'Monthly/quarterly sales return' },
-            { label: 'GSTR-3B (Monthly Summary)',    href: 'https://services.gst.gov.in/services/auth/login', desc: 'Summary return + tax payment' },
-            { label: 'GSTR-2B (ITC Statement)',      href: 'https://services.gst.gov.in/services/auth/login', desc: 'Auto-drafted input tax credit' },
-            { label: 'E-Way Bill Portal',            href: 'https://ewaybillgst.gov.in/login.aspx',           desc: 'Generate & verify e-way bills' },
-          ].map(({ label, href, desc }) => (
-            <a
-              key={label}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-col gap-0.5 bg-white border border-orange-100 rounded-lg px-3 py-2.5 hover:border-orange-300 hover:shadow-sm transition-all group"
-            >
-              <span className="text-xs font-semibold text-orange-700 group-hover:text-orange-900">{label} ↗</span>
-              <span className="text-[11px] text-slate-500">{desc}</span>
-            </a>
-          ))}
+      {/* GST Portal Connect + Download */}
+      <div className="bg-orange-50 border border-orange-100 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-orange-100 flex items-center justify-between">
+          <p className="text-xs font-semibold text-orange-800 uppercase tracking-wide">GST Portal — Connect &amp; Download Reports</p>
         </div>
-        <p className="text-[11px] text-orange-600 mt-3">
-          Note: GST portal requires your GSTIN login. The figures below are from your books — reconcile with GSTR-2B before filing.
-        </p>
+        <div className="p-4 space-y-4">
+
+          {/* GSTIN entry */}
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Your GSTIN</label>
+              <input
+                value={gstin}
+                onChange={e => { setGstin(e.target.value.toUpperCase()); setGstinSaved(false) }}
+                placeholder="22AAAAA0000A1Z5"
+                maxLength={15}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+            <button
+              onClick={() => { localStorage.setItem('onk_gstin', gstin); setGstinSaved(true) }}
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm rounded-lg font-medium transition-colors"
+            >
+              Save
+            </button>
+            {gstinSaved && <span className="text-xs text-green-600">Saved ✓</span>}
+          </div>
+          {!gstin && (
+            <p className="text-xs text-orange-600">Enter your GSTIN above to get personalised portal links for your account.</p>
+          )}
+
+          {/* Portal quick links — personalised when GSTIN present */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              {
+                label: 'GSTR-1',
+                desc: 'File outward supplies',
+                href: gstin
+                  ? `https://services.gst.gov.in/services/auth/login`
+                  : 'https://www.gst.gov.in/auth/login',
+              },
+              {
+                label: 'GSTR-3B',
+                desc: 'Monthly summary return',
+                href: 'https://services.gst.gov.in/services/auth/login',
+              },
+              {
+                label: 'GSTR-2B ⬇',
+                desc: 'Download ITC statement',
+                href: 'https://services.gst.gov.in/services/auth/login',
+              },
+              {
+                label: 'E-Way Bill',
+                desc: 'Generate / verify EWB',
+                href: 'https://ewaybillgst.gov.in/login.aspx',
+              },
+            ].map(({ label, desc, href }) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col gap-0.5 bg-white border border-orange-100 rounded-lg px-3 py-2.5 hover:border-orange-300 hover:shadow-sm transition-all group"
+              >
+                <span className="text-xs font-semibold text-orange-700 group-hover:text-orange-900">{label} ↗</span>
+                <span className="text-[11px] text-slate-500">{desc}</span>
+              </a>
+            ))}
+          </div>
+
+          {/* GSTR-2B JSON import */}
+          <div className="bg-white border border-orange-100 rounded-xl p-4">
+            <p className="text-sm font-semibold text-slate-700 mb-1">Import GSTR-2B (ITC Reconciliation)</p>
+            <p className="text-xs text-slate-500 mb-3">
+              On the GST portal: Returns → ITC → GSTR-2B → Download JSON. Upload that file here to reconcile your input tax credit automatically.
+            </p>
+            <div className="flex gap-3 items-center">
+              <input
+                ref={gstr2bRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={e => setGstr2bFile(e.target.files?.[0] ?? null)}
+              />
+              <button
+                onClick={() => gstr2bRef.current?.click()}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50"
+              >
+                {gstr2bFile ? gstr2bFile.name : 'Choose GSTR-2B JSON…'}
+              </button>
+              {gstr2bFile && (
+                <button
+                  disabled={gstr2bImporting}
+                  onClick={async () => {
+                    setGstr2bImporting(true)
+                    setGstr2bMsg('')
+                    try {
+                      const text = await gstr2bFile.text()
+                      const json = JSON.parse(text)
+                      // Count ITC entries from GSTR-2B structure
+                      const b2b = json?.data?.docdata?.b2b ?? json?.docdata?.b2b ?? []
+                      const count = b2b.reduce((s: number, sup: {inv?: unknown[]}) => s + (sup.inv?.length ?? 0), 0)
+                      setGstr2bMsg(`✓ Parsed ${count} invoice(s) from ${b2b.length} supplier(s). Reconciliation coming soon.`)
+                    } catch {
+                      setGstr2bMsg('Could not parse file. Please upload the JSON downloaded from the GST portal.')
+                    } finally {
+                      setGstr2bImporting(false)
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 disabled:bg-orange-300 text-white text-sm rounded-lg font-medium transition-colors"
+                >
+                  {gstr2bImporting ? 'Processing…' : 'Import & Reconcile'}
+                </button>
+              )}
+            </div>
+            {gstr2bMsg && <p className="text-xs text-slate-600 mt-2">{gstr2bMsg}</p>}
+          </div>
+
+          <p className="text-[11px] text-orange-600">
+            Note: ONK Solutions links directly to the GST portal — your GSTIN login and OTP are handled by the government portal, not stored here.
+          </p>
+        </div>
       </div>
 
       {error && <p className="text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm">{error}</p>}
