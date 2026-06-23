@@ -37,15 +37,24 @@ async function resolveAccountId(
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { tenantId, date, category, description, amount, gstRate, paidVia, paidTo, reference } = body
+    const { date, category, description, amount, gstRate, paidVia, paidTo, reference } = body
 
-    if (!tenantId || !date || !amount || !category) {
+    if (!date || !amount || !category) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: tenantUser } = await supabase
+      .from('tenant_users')
+      .select('tenant_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single()
+    if (!tenantUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const tenantId = tenantUser.tenant_id
 
     const expenseCode = EXPENSE_CATEGORY_CODES[category] || '5920'
     const expenseAccountId = await resolveAccountId(supabase, tenantId, expenseCode)

@@ -19,7 +19,7 @@ export default function PurchasesPageClient({ tenantId, vendors, bankAccounts, r
     const res = await fetch('/api/purchases', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, tenantId }),
+      body: JSON.stringify(data),
     })
     if (!res.ok) {
       const err = await res.json()

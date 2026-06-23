@@ -59,7 +59,7 @@ export default function PaymentsPageClient({ tenantId, creditors, bankAccounts, 
       const res = await fetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, tenantId }),
+        body: JSON.stringify(form),
       })
       if (!res.ok) {
         const err = await res.json()

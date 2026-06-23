@@ -18,7 +18,7 @@ export default function ExpensesPageClient({ tenantId, bankAccounts, recentEntri
     const res = await fetch('/api/expenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, tenantId }),
+      body: JSON.stringify(data),
     })
     if (!res.ok) {
       const err = await res.json()

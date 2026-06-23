@@ -26,15 +26,24 @@ async function resolveAccountId(
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { tenantId, date, vendorId, vendorName, amount, paidFrom, narration, reference } = body
+    const { date, vendorId, vendorName, amount, paidFrom, narration, reference } = body
 
-    if (!tenantId || !date || !amount || !paidFrom) {
+    if (!date || !amount || !paidFrom) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: tenantUser } = await supabase
+      .from('tenant_users')
+      .select('tenant_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single()
+    if (!tenantUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const tenantId = tenantUser.tenant_id
 
     const creditorsAccountId = await resolveAccountId(supabase, tenantId, 'CREDITORS')
     const bankAccountId = paidFrom === 'cash'

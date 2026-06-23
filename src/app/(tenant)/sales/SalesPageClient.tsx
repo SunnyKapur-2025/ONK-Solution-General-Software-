@@ -20,7 +20,7 @@ export default function SalesPageClient({ tenantId, customers, bankAccounts, rec
     const res = await fetch('/api/sales', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, tenantId }),
+      body: JSON.stringify(data),
     })
     if (!res.ok) {
       const err = await res.json()

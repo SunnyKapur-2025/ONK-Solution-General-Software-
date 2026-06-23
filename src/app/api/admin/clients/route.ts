@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { getIndustryById } from '@/lib/industries'
 import { ModuleKey } from '@/types'
 
+async function requireSuperadmin() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data } = await supabase
+    .from('tenant_users')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .eq('role', 'superadmin')
+    .single()
+  return data ? user : null
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const caller = await requireSuperadmin()
+    if (!caller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
     const body = await req.json()
     const { tenant, modules, adminUser } = body as {
       tenant: {
@@ -129,6 +146,9 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
+    const caller = await requireSuperadmin()
+    if (!caller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
     const supabase = await createAdminClient()
 
     const { data, error } = await supabase

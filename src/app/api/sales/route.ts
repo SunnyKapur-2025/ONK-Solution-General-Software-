@@ -37,16 +37,25 @@ async function resolveAccountId(
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { tenantId, date, customerName, customerId, invoiceNumber,
+    const { date, customerName, customerId, invoiceNumber,
       description, amount, gstRate, gstType, paidVia, paidNow, reference } = body
 
-    if (!tenantId || !date || !description || !amount) {
+    if (!date || !description || !amount) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: tenantUser } = await supabase
+      .from('tenant_users')
+      .select('tenant_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single()
+    if (!tenantUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const tenantId = tenantUser.tenant_id
 
     // Resolve account IDs
     const cgstAmount = gstRate > 0 && gstType === 'intra' ? Math.round((amount * gstRate / 2) / 100 * 100) / 100 : 0
