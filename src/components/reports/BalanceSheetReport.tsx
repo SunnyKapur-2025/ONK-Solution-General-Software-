@@ -1,237 +1,231 @@
 'use client'
 
 import { formatCurrency } from '@/lib/utils'
-import type { BalanceSheetReport, ScheduleIIIPart, ScheduleIIILineItem } from '@/lib/accounting/reports'
+import type { BalanceSheetReport, ScheduleIIIPart } from '@/lib/accounting/reports'
 
 interface Props {
   report: BalanceSheetReport
+  prevReport?: BalanceSheetReport | null
 }
 
-function LineItemRows({ item }: { item: ScheduleIIILineItem }) {
+const TS = { fontFamily: "'Times New Roman', Times, serif", fontSize: '11pt' } as const
+
+function getPartTotal(parts: ScheduleIIIPart[], partKey: string): number {
+  return parts.find(p => p.part === partKey)?.total ?? 0
+}
+
+function getItemTotal(parts: ScheduleIIIPart[], partKey: string, itemKey: string): number {
+  const part = parts.find(p => p.part === partKey)
+  return part?.items.find(i => i.item === itemKey)?.total ?? 0
+}
+
+type SideProps = {
+  parts: ScheduleIIIPart[]
+  prevParts?: ScheduleIIIPart[] | null
+  side: 'el' | 'assets'
+}
+
+function Side({ parts, prevParts, side }: SideProps) {
+  const elHeads = [
+    {
+      part: 'I', label: 'Shareholders\' Funds', items: [
+        { key: 'share_capital', label: '(a) Share capital' },
+        { key: 'reserves', label: '(b) Reserves and surplus' },
+        { key: 'money_securities', label: '(c) Money received against share warrants' },
+      ]
+    },
+    {
+      part: 'II', label: 'Share Application Money Pending Allotment', items: [
+        { key: 'share_app_money', label: 'Share application money pending allotment' },
+      ]
+    },
+    {
+      part: 'III', label: 'Non-Current Liabilities', items: [
+        { key: 'long_term_borrowings', label: '(a) Long-term borrowings' },
+        { key: 'deferred_tax', label: '(b) Deferred tax liabilities (Net)' },
+        { key: 'other_long_term', label: '(c) Other long-term liabilities' },
+        { key: 'long_term_provisions', label: '(d) Long-term provisions' },
+      ]
+    },
+    {
+      part: 'IV', label: 'Current Liabilities', items: [
+        { key: 'short_term_borrowings', label: '(a) Short-term borrowings' },
+        { key: 'trade_payables', label: '(b) Trade payables' },
+        { key: 'other_current_liabilities', label: '(c) Other current liabilities' },
+        { key: 'short_term_provisions', label: '(d) Short-term provisions' },
+      ]
+    },
+  ]
+
+  const assetHeads = [
+    {
+      part: 'I', label: 'Non-Current Assets', items: [
+        { key: 'fixed_assets', label: '(a) Fixed assets' },
+        { key: 'non_current_investments', label: '(b) Non-current investments' },
+        { key: 'deferred_tax_asset', label: '(c) Deferred tax assets (Net)' },
+        { key: 'long_term_loans', label: '(d) Long-term loans and advances' },
+        { key: 'other_non_current', label: '(e) Other non-current assets' },
+      ]
+    },
+    {
+      part: 'II', label: 'Current Assets', items: [
+        { key: 'current_investments', label: '(a) Current investments' },
+        { key: 'inventories', label: '(b) Inventories' },
+        { key: 'trade_receivables', label: '(c) Trade receivables' },
+        { key: 'cash_equivalents', label: '(d) Cash and cash equivalents' },
+        { key: 'short_term_loans', label: '(e) Short-term loans and advances' },
+        { key: 'other_current', label: '(f) Other current assets' },
+      ]
+    },
+  ]
+
+  const heads = side === 'el' ? elHeads : assetHeads
+
   return (
     <>
-      <tr>
-        <td className="pl-6 pr-2 py-1.5 text-xs font-semibold text-slate-600 border-b border-slate-100" colSpan={2}>
-          {item.label}
-        </td>
-      </tr>
-      {item.accounts.map((a) => (
-        <tr key={a.accountId} className="hover:bg-slate-50">
-          <td className="pl-10 pr-2 py-1 text-xs text-slate-600 border-b border-slate-50">{a.accountName}</td>
-          <td className="pr-4 py-1 text-right text-xs font-mono text-slate-700 border-b border-slate-50 whitespace-nowrap">
-            {formatCurrency(a.balance)}
-          </td>
-        </tr>
-      ))}
-      <tr className="border-b border-slate-200">
-        <td className="pl-6 pr-2 py-1 text-xs text-slate-500"></td>
-        <td className="pr-4 py-1 text-right text-xs font-mono font-semibold text-slate-800 whitespace-nowrap border-t border-slate-300">
-          {formatCurrency(item.total)}
-        </td>
-      </tr>
+      {heads.map(head => {
+        const partTotal = getPartTotal(parts, head.part)
+        const prevPartTotal = prevParts ? getPartTotal(prevParts, head.part) : 0
+        if (partTotal === 0 && prevPartTotal === 0) return null
+
+        return (
+          <tbody key={head.part}>
+            <tr style={{ borderTop: '1px solid #94a3b8' }}>
+              <td style={{ ...TS, fontWeight: 'bold', padding: '4px 8px', background: '#f8fafc' }} colSpan={prevParts ? 3 : 2}>
+                {head.part}. {head.label}
+              </td>
+            </tr>
+            {head.items.map(item => {
+              const val = getItemTotal(parts, head.part, item.key)
+              const prev = prevParts ? getItemTotal(prevParts, head.part, item.key) : 0
+              if (val === 0 && prev === 0) return null
+              return (
+                <tr key={item.key} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ ...TS, paddingLeft: '20px', paddingTop: '2px', paddingBottom: '2px', paddingRight: '8px', color: '#374151' }}>{item.label}</td>
+                  {prevParts && (
+                    <td style={{ ...TS, textAlign: 'right', paddingRight: '12px', paddingTop: '2px', paddingBottom: '2px', color: '#6b7280', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                      {prev ? formatCurrency(prev) : '—'}
+                    </td>
+                  )}
+                  <td style={{ ...TS, textAlign: 'right', paddingRight: '8px', paddingTop: '2px', paddingBottom: '2px', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                    {val ? formatCurrency(val) : '—'}
+                  </td>
+                </tr>
+              )
+            })}
+            <tr style={{ borderBottom: '1px solid #cbd5e1', background: '#f1f5f9' }}>
+              <td style={{ ...TS, fontWeight: 'bold', paddingLeft: '8px', paddingTop: '3px', paddingBottom: '3px', paddingRight: '8px' }}>
+                Total {head.label}
+              </td>
+              {prevParts && (
+                <td style={{ ...TS, textAlign: 'right', paddingRight: '12px', fontFamily: 'monospace', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                  {formatCurrency(prevPartTotal)}
+                </td>
+              )}
+              <td style={{ ...TS, textAlign: 'right', paddingRight: '8px', fontFamily: 'monospace', fontWeight: 'bold', whiteSpace: 'nowrap', borderTop: '1px solid #64748b' }}>
+                {formatCurrency(partTotal)}
+              </td>
+            </tr>
+          </tbody>
+        )
+      })}
     </>
   )
 }
 
-function PartSection({ part }: { part: ScheduleIIIPart }) {
-  if (part.items.length === 0) return null
-  return (
-    <>
-      <tr className="bg-slate-50">
-        <td className="px-4 py-2 text-xs font-bold text-slate-700 border-b border-slate-200" colSpan={2}>
-          {part.part}. {part.heading}
-        </td>
-      </tr>
-      {part.items.map((item) => (
-        <LineItemRows key={item.item} item={item} />
-      ))}
-      <tr className="bg-slate-100 border-t border-slate-300">
-        <td className="px-4 py-2 text-xs font-bold text-slate-700">
-          Total {part.heading}
-        </td>
-        <td className="pr-4 py-2 text-right text-xs font-bold font-mono text-slate-800 whitespace-nowrap">
-          {formatCurrency(part.total)}
-        </td>
-      </tr>
-    </>
-  )
-}
-
-export default function BalanceSheetReportView({ report }: Props) {
+export default function BalanceSheetReportView({ report, prevReport }: Props) {
   const { equityAndLiabilities, assets, isBalanced, difference, asOnDate } = report
 
-  const formattedDate = new Date(asOnDate).toLocaleDateString('en-IN', {
-    day: 'numeric', month: 'long', year: 'numeric',
-  })
+  const formattedDate = new Date(asOnDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+  const prevDate = prevReport ? new Date(prevReport.asOnDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : null
 
   return (
-    <div className="print:text-[10pt]">
-      {/* Title */}
-      <div className="text-center mb-4 print:mb-2">
-        <h2 className="text-lg font-bold text-slate-900 uppercase tracking-wide">Balance Sheet</h2>
-        <p className="text-sm text-slate-500">as at {formattedDate}</p>
-        <p className="text-xs text-slate-400 mt-0.5">NCE Format — ICAI Guidance Note on Financial Statements for Non-Corporate Entities</p>
+    <div style={TS}>
+      <style>{`
+        @media print {
+          @page { size: A4 portrait; margin: 12mm 10mm 12mm 10mm; }
+          body * { visibility: hidden; }
+          #bs-printable, #bs-printable * { visibility: visible; }
+          #bs-printable { position: absolute; top: 0; left: 0; width: 100%; }
+        }
+      `}</style>
+
+      {/* Header */}
+      <div style={{ textAlign: 'center', borderBottom: '2px solid #1e293b', paddingBottom: '8px', marginBottom: '8px' }}>
+        <p style={{ ...TS, fontSize: '13pt', fontWeight: 'bold' }}>Balance Sheet</p>
+        <p style={{ ...TS, fontSize: '10pt', color: '#374151' }}>as at {formattedDate}</p>
+        <p style={{ fontSize: '9pt', color: '#64748b' }}>Schedule III — Companies Act, 2013 &nbsp;·&nbsp; (Amount in ₹)</p>
       </div>
 
-      {/* Balance warning */}
       {!isBalanced && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-300 rounded-lg text-sm text-red-700 font-medium print:border-red-400">
+        <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', marginBottom: '8px', color: '#991b1b' }}>
           Balance Sheet does not balance — difference: {formatCurrency(difference)}
         </div>
       )}
 
-      {/* Two-column table */}
-      <div className="overflow-x-auto">
-        <table className="w-full border border-slate-300 text-sm print:border-black" style={{ borderCollapse: 'collapse' }}>
-          <thead>
-            <tr className="border-b-2 border-slate-300 print:border-black">
-              <th className="px-4 py-2 text-left text-xs font-bold text-slate-700 border-r border-slate-300 print:border-black w-1/2">
-                EQUITY AND LIABILITIES
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-bold text-slate-500 border-r border-slate-200 print:border-black w-20">
-                Amount (₹)
-              </th>
-              <th className="px-4 py-2 text-left text-xs font-bold text-slate-700 border-r border-slate-300 print:border-black">
-                ASSETS
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-bold text-slate-500 print:border-black">
-                Amount (₹)
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Render rows interleaved — equity/liabilities on left, assets on right */}
-            <BalanceSheetRows
-              elParts={equityAndLiabilities.parts}
-              elTotal={equityAndLiabilities.total}
-              assetParts={assets.parts}
-              assetTotal={assets.total}
-            />
-          </tbody>
-        </table>
-      </div>
+      {/* Two-column layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        {/* Left — Equity & Liabilities */}
+        <div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', ...TS }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #1e293b', background: '#f8fafc' }}>
+                <th style={{ ...TS, textAlign: 'left', padding: '6px 8px', fontWeight: 'bold' }}>Equity &amp; Liabilities</th>
+                {prevReport && <th style={{ ...TS, textAlign: 'right', paddingRight: '12px', fontWeight: 'bold', color: '#6b7280', whiteSpace: 'nowrap' }}>{prevDate?.slice(-4)}</th>}
+                <th style={{ ...TS, textAlign: 'right', paddingRight: '8px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{formattedDate.slice(-4)}</th>
+              </tr>
+            </thead>
+            <Side parts={equityAndLiabilities.parts} prevParts={prevReport?.equityAndLiabilities.parts} side="el" />
+            <tfoot>
+              <tr style={{ borderTop: '2px solid #1e293b' }}>
+                <td style={{ ...TS, fontWeight: 'bold', padding: '6px 8px' }}>TOTAL</td>
+                {prevReport && (
+                  <td style={{ ...TS, textAlign: 'right', paddingRight: '12px', fontFamily: 'monospace', fontWeight: 'bold', color: '#6b7280', whiteSpace: 'nowrap', borderBottom: '4px double #1e293b' }}>
+                    {formatCurrency(prevReport.equityAndLiabilities.total)}
+                  </td>
+                )}
+                <td style={{ ...TS, textAlign: 'right', paddingRight: '8px', fontFamily: 'monospace', fontWeight: 'bold', whiteSpace: 'nowrap', borderBottom: '4px double #1e293b' }}>
+                  {formatCurrency(equityAndLiabilities.total)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
 
-      {/* Totals row */}
-      <div className="mt-0 border border-t-0 border-slate-300 print:border-black">
-        <div className="flex">
-          <div className="w-1/2 border-r border-slate-300 print:border-black px-4 py-2.5 flex justify-between items-center bg-slate-800 print:bg-white">
-            <span className="text-sm font-bold text-white print:text-black">TOTAL</span>
-            <span className="text-sm font-bold font-mono text-white print:text-black">{formatCurrency(equityAndLiabilities.total)}</span>
-          </div>
-          <div className="w-1/2 px-4 py-2.5 flex justify-between items-center bg-slate-800 print:bg-white">
-            <span className="text-sm font-bold text-white print:text-black">TOTAL</span>
-            <span className="text-sm font-bold font-mono text-white print:text-black">{formatCurrency(assets.total)}</span>
-          </div>
+        {/* Right — Assets */}
+        <div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', ...TS }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #1e293b', background: '#f8fafc' }}>
+                <th style={{ ...TS, textAlign: 'left', padding: '6px 8px', fontWeight: 'bold' }}>Assets</th>
+                {prevReport && <th style={{ ...TS, textAlign: 'right', paddingRight: '12px', fontWeight: 'bold', color: '#6b7280', whiteSpace: 'nowrap' }}>{prevDate?.slice(-4)}</th>}
+                <th style={{ ...TS, textAlign: 'right', paddingRight: '8px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{formattedDate.slice(-4)}</th>
+              </tr>
+            </thead>
+            <Side parts={assets.parts} prevParts={prevReport?.assets.parts} side="assets" />
+            <tfoot>
+              <tr style={{ borderTop: '2px solid #1e293b' }}>
+                <td style={{ ...TS, fontWeight: 'bold', padding: '6px 8px' }}>TOTAL</td>
+                {prevReport && (
+                  <td style={{ ...TS, textAlign: 'right', paddingRight: '12px', fontFamily: 'monospace', fontWeight: 'bold', color: '#6b7280', whiteSpace: 'nowrap', borderBottom: '4px double #1e293b' }}>
+                    {formatCurrency(prevReport.assets.total)}
+                  </td>
+                )}
+                <td style={{ ...TS, textAlign: 'right', paddingRight: '8px', fontFamily: 'monospace', fontWeight: 'bold', whiteSpace: 'nowrap', borderBottom: '4px double #1e293b' }}>
+                  {formatCurrency(assets.total)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
 
-      {isBalanced && (
-        <p className="text-center text-xs text-green-600 mt-3 print:hidden">
-          Balance Sheet is balanced.
+      <div style={{ borderTop: '1px solid #cbd5e1', marginTop: '8px', paddingTop: '4px', textAlign: 'center' }}>
+        <p style={{ fontSize: '9pt', color: '#64748b' }}>
+          The accompanying notes are an integral part of these financial statements.
+          &nbsp;·&nbsp; Schedule III — Companies Act, 2013.
         </p>
-      )}
+      </div>
     </div>
-  )
-}
-
-// Renders two sides side-by-side row by row using a flat row approach
-function BalanceSheetRows({
-  elParts, elTotal,
-  assetParts, assetTotal,
-}: {
-  elParts: ScheduleIIIPart[]
-  elTotal: number
-  assetParts: ScheduleIIIPart[]
-  assetTotal: number
-}) {
-  // Flatten left side (equity & liabilities) into display rows
-  type Row = { kind: 'part-heading'; heading: string; part: string }
-            | { kind: 'item-heading'; label: string }
-            | { kind: 'account'; name: string; balance: number }
-            | { kind: 'item-total'; total: number }
-            | { kind: 'part-total'; label: string; total: number }
-            | { kind: 'spacer' }
-
-  function flattenSide(parts: ScheduleIIIPart[]): Row[] {
-    const rows: Row[] = []
-    for (const part of parts) {
-      if (part.items.length === 0) continue
-      rows.push({ kind: 'part-heading', heading: part.heading, part: part.part })
-      for (const item of part.items) {
-        rows.push({ kind: 'item-heading', label: item.label })
-        for (const a of item.accounts) {
-          rows.push({ kind: 'account', name: a.accountName, balance: a.balance })
-        }
-        rows.push({ kind: 'item-total', total: item.total })
-      }
-      rows.push({ kind: 'part-total', label: `Total ${part.heading}`, total: part.total })
-    }
-    return rows
-  }
-
-  const left = flattenSide(elParts)
-  const right = flattenSide(assetParts)
-  const maxLen = Math.max(left.length, right.length)
-
-  function renderCell(row: Row | undefined): React.ReactNode {
-    if (!row) return <td className="px-4 py-1.5" colSpan={2}></td>
-    switch (row.kind) {
-      case 'part-heading':
-        return (
-          <td className="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-50 border-b border-slate-200" colSpan={2}>
-            {row.part}. {row.heading}
-          </td>
-        )
-      case 'item-heading':
-        return (
-          <td className="pl-6 pr-2 py-1.5 text-xs font-semibold text-slate-600 border-b border-slate-100" colSpan={2}>
-            {row.label}
-          </td>
-        )
-      case 'account':
-        return (
-          <>
-            <td className="pl-10 pr-2 py-1 text-xs text-slate-600 border-b border-slate-50">{row.name}</td>
-            <td className="pr-4 py-1 text-right text-xs font-mono text-slate-700 border-b border-slate-50 whitespace-nowrap">
-              {formatCurrency(row.balance)}
-            </td>
-          </>
-        )
-      case 'item-total':
-        return (
-          <>
-            <td className="pl-6 py-1 text-xs text-slate-400 border-b border-slate-200"></td>
-            <td className="pr-4 py-1 text-right text-xs font-mono font-semibold text-slate-800 border-b border-slate-200 border-t border-slate-300 whitespace-nowrap">
-              {formatCurrency(row.total)}
-            </td>
-          </>
-        )
-      case 'part-total':
-        return (
-          <td className="px-4 py-2 bg-slate-100 border-b border-slate-300" colSpan={2}>
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-slate-700">{row.label}</span>
-              <span className="text-xs font-bold font-mono text-slate-800 whitespace-nowrap">{formatCurrency(row.total)}</span>
-            </div>
-          </td>
-        )
-      case 'spacer':
-        return <td className="px-4 py-1" colSpan={2}></td>
-    }
-  }
-
-  return (
-    <>
-      {Array.from({ length: maxLen }).map((_, i) => (
-        <tr key={i} className="hover:bg-slate-50/50">
-          <td className="border-r border-slate-200 print:border-black" colSpan={2} style={{ padding: 0 }}>
-            <table className="w-full"><tbody><tr>{renderCell(left[i])}</tr></tbody></table>
-          </td>
-          <td colSpan={2} style={{ padding: 0 }}>
-            <table className="w-full"><tbody><tr>{renderCell(right[i])}</tr></tbody></table>
-          </td>
-        </tr>
-      ))}
-    </>
   )
 }
