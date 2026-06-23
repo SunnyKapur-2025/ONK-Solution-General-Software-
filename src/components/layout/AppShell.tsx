@@ -75,13 +75,25 @@ const NAV_GROUPS: { label: string; keys: ModuleKey[] }[] = [
 
 interface Props {
   tenantName: string
+  tenantId?: string
   userName: string
   userRole: string
   enabledModules: ModuleKey[]
+  companies?: { id: string; name: string }[]
   children: React.ReactNode
 }
 
-export default function AppShell({ tenantName, userName, userRole, enabledModules, children }: Props) {
+export default function AppShell({ tenantName, tenantId, userName, userRole, enabledModules, companies = [], children }: Props) {
+  const [switcherOpen, setSwitcherOpen] = useState(false)
+  async function switchCompany(id: string) {
+    if (id === tenantId) { setSwitcherOpen(false); return }
+    await fetch('/api/companies/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId: id }),
+    })
+    window.location.href = '/dashboard'
+  }
   const pathname = usePathname()
   const router = useRouter()
   const [powerMode, setPowerMode] = useState(false)
@@ -135,14 +147,22 @@ export default function AppShell({ tenantName, userName, userRole, enabledModule
           collapsed ? 'w-14' : 'w-56'
         }`}
       >
-        {/* Logo + collapse toggle */}
-        <div className="px-3 py-4 border-b border-slate-800 flex items-center gap-2 min-h-[57px]">
+        {/* Logo + company switcher + collapse toggle */}
+        <div className="px-3 py-4 border-b border-slate-800 flex items-center gap-2 min-h-[57px] relative">
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-white font-bold text-base leading-tight">
                 <span className="text-blue-400">ONK</span> Solutions
               </p>
-              <p className="text-slate-400 text-xs mt-0.5 truncate">{tenantName}</p>
+              <button
+                type="button"
+                onClick={() => setSwitcherOpen((o) => !o)}
+                className="mt-0.5 flex items-center gap-1 text-slate-400 text-xs hover:text-white truncate max-w-full"
+                title="Switch company"
+              >
+                <span className="truncate">{tenantName || 'No company'}</span>
+                <span className="text-slate-600">▾</span>
+              </button>
             </div>
           )}
           <button
@@ -152,6 +172,27 @@ export default function AppShell({ tenantName, userName, userRole, enabledModule
           >
             {collapsed ? '»' : '«'}
           </button>
+
+          {switcherOpen && !collapsed && (
+            <div className="absolute left-3 right-3 top-full mt-1 z-50 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden">
+              <div className="max-h-64 overflow-y-auto">
+                {companies.map((c) => (
+                  <button key={c.id} onClick={() => switchCompany(c.id)}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-700 ${c.id === tenantId ? 'text-blue-400 font-medium' : 'text-slate-200'}`}>
+                    {c.id === tenantId ? '✓ ' : '  '}{c.name}
+                  </button>
+                ))}
+              </div>
+              <Link href="/companies/new" onClick={() => setSwitcherOpen(false)}
+                className="block border-t border-slate-700 px-3 py-2 text-sm text-blue-400 hover:bg-slate-700">
+                + Add company
+              </Link>
+              <Link href="/companies" onClick={() => setSwitcherOpen(false)}
+                className="block border-t border-slate-700 px-3 py-2 text-xs text-slate-400 hover:bg-slate-700">
+                Manage companies
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Power Mode quick entry */}
