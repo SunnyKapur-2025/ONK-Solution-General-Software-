@@ -30,3 +30,5 @@ logs/
 .next
 node_modules
 tsconfig.tsbuildinfo
+stripped_backup_*/
+audit_report.txt
