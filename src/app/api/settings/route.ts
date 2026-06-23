@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getActiveTenantUser } from '@/lib/active-tenant'
 
 export async function GET() {
   try {
@@ -8,7 +7,12 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const tenantUser = await getActiveTenantUser(supabase, user.id)
+    const { data: tenantUser } = await supabase
+      .from('tenant_users')
+      .select('tenant_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single()
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { data, error } = await supabase
@@ -31,7 +35,12 @@ export async function PUT(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const tenantUser = await getActiveTenantUser(supabase, user.id)
+    const { data: tenantUser } = await supabase
+      .from('tenant_users')
+      .select('tenant_id, role')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single()
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (tenantUser.role !== 'owner') {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getIndustryById } from '@/lib/industries'
 import { slugify } from '@/lib/utils'
 import { ModuleKey } from '@/types'
@@ -39,15 +39,17 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await req.json()
-    const {
-      name, industryId, gstin, pan, phone, email,
-      address, city, state, pincode,
-      financialYearStart, subscriptionPlan, extraModules,
-    } = body as {
+    const { name, industryId, gstin, pan, phone, email, address, city, state, pincode, financialYearStart, subscriptionPlan, extraModules } = body as {
       name: string
       industryId: string
-      gstin?: string; pan?: string; phone?: string; email?: string
-      address?: string; city?: string; state?: string; pincode?: string
+      gstin?: string
+      pan?: string
+      phone?: string
+      email?: string
+      address?: string
+      city?: string
+      state?: string
+      pincode?: string
       financialYearStart?: number
       subscriptionPlan?: string
       extraModules?: ModuleKey[]
@@ -59,50 +61,66 @@ export async function POST(req: NextRequest) {
     const industry = getIndustryById(industryId)
     if (!industry) return NextResponse.json({ error: 'Invalid industry' }, { status: 400 })
 
-    // Generate unique slug — append random suffix to avoid conflicts from
-    // prior partial creations that the user can't see due to RLS
+    // Use admin client to bypass RLS for the multi-table insert + COA seed.
+    // Authorization is already enforced above (auth check + created_by binding).
+    const admin = await createAdminClient()
+
     const baseSlug = slugify(name)
-    const rand = Math.random().toString(36).slice(2, 6)
     let slug = baseSlug
-    for (let i = 1; i <= 10; i++) {
-      const { data: existing } = await supabase
-        .from('tenants')
-        .select('id')
-        .eq('slug', slug)
-        .maybeSingle()
+    let suffix = 1
+    while (true) {
+      const { data: existing } = await admin.from('tenants').select('id').eq('slug', slug).maybeSingle()
       if (!existing) break
-      slug = `${baseSlug}-${rand}-${i}`
-      if (i === 10) slug = `${baseSlug}-${Date.now()}`
+      suffix += 1
+      slug = `${baseSlug}-${suffix}`
+      if (suffix > 50) return NextResponse.json({ error: 'Could not generate unique slug' }, { status: 500 })
     }
 
-    const modules: ModuleKey[] = Array.from(
-      new Set([...(industry.defaultModules || []), ...(extraModules || [])])
-    )
+    const { data: tenant, error: tErr } = await admin
+      .from('tenants')
+      .insert({
+        name, slug, industry_id: industryId,
+        gstin: gstin || null,
+        pan: pan || null,
+        phone: phone || null,
+        email: email || null,
+        address: address || null,
+        city: city || null,
+        state: state || null,
+        pincode: pincode || null,
+        financial_year_start: financialYearStart || 4,
+        subscription_plan: subscriptionPlan || 'starter',
+        created_by: user.id,
+      })
+      .select()
+      .single()
 
-    // Use SECURITY DEFINER RPC — no admin client / service role key needed
-    const { data: tenantId, error: rpcErr } = await supabase.rpc('create_company_for_user', {
-      p_name: name,
-      p_slug: slug,
-      p_industry_id: industryId,
-      p_gstin: gstin || null,
-      p_pan: pan || null,
-      p_phone: phone || null,
-      p_email: email || null,
-      p_address: address || null,
-      p_city: city || null,
-      p_state: state || null,
-      p_pincode: pincode || null,
-      p_financial_year_start: financialYearStart || 4,
-      p_subscription_plan: subscriptionPlan || 'starter',
-      p_modules: modules,
+    if (tErr) return NextResponse.json({ error: tErr.message }, { status: 500 })
+
+    const userName = (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'Owner'
+
+    const { error: tuErr } = await admin.from('tenant_users').insert({
+      tenant_id: tenant.id,
+      user_id: user.id,
+      role: 'owner',
+      name: userName,
+      email: user.email,
     })
-
-    if (rpcErr) {
-      console.error('create_company_for_user RPC error:', rpcErr.message)
-      return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+    if (tuErr) {
+      await admin.from('tenants').delete().eq('id', tenant.id)
+      return NextResponse.json({ error: tuErr.message }, { status: 500 })
     }
 
-    return NextResponse.json({ tenantId, slug }, { status: 201 })
+    const modules: ModuleKey[] = Array.from(new Set([...(industry.defaultModules || []), ...(extraModules || [])]))
+    if (modules.length > 0) {
+      const rows = modules.map((m) => ({ tenant_id: tenant.id, module_key: m, is_enabled: true, enabled_by: user.id }))
+      await admin.from('tenant_modules').insert(rows)
+    }
+
+    const { error: coaErr } = await admin.rpc('seed_chart_of_accounts', { p_tenant_id: tenant.id })
+    if (coaErr) console.error('CoA seed:', coaErr.message)
+
+    return NextResponse.json({ tenantId: tenant.id, slug: tenant.slug }, { status: 201 })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Internal server error'
     console.error('Create company error:', msg)

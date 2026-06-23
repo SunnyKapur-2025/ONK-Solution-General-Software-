@@ -77,7 +77,6 @@ export default function AppShell({ tenantName, tenantId, userName, userRole, ena
   }
   const pathname = usePathname()
   const router = useRouter()
-  const [powerMode, setPowerMode] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
 
@@ -93,13 +92,11 @@ export default function AppShell({ tenantName, tenantId, userName, userRole, ena
     setSigningOut(true)
     const supabase = createClient()
     await supabase.auth.signOut()
-    window.location.href = '/auth/login'
+    router.replace('/auth/login')
   }, [router])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      // Ctrl+M — toggle power mode
-      if (e.ctrlKey && e.key === 'm') { e.preventDefault(); router.push('/voucher') }
       // Ctrl+N — new voucher
       if (e.ctrlKey && e.key === 'n') { e.preventDefault(); router.push('/voucher') }
       // Ctrl+\ — toggle sidebar
@@ -117,10 +114,8 @@ export default function AppShell({ tenantName, tenantId, userName, userRole, ena
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [router, navRoutes])
 
-  const isPowerMode = powerMode || pathname === '/voucher'
-
   return (
-    <div className={`flex h-screen overflow-hidden ${isPowerMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
+    <div className="flex h-screen overflow-hidden bg-slate-50">
 
       {/* ── Sidebar ── */}
       <aside
@@ -174,22 +169,6 @@ export default function AppShell({ tenantName, tenantId, userName, userRole, ena
               </Link>
             </div>
           )}
-        </div>
-
-        {/* Power Mode quick entry */}
-        <div className={`pt-3 ${collapsed ? 'px-1' : 'px-3'}`}>
-          <Link href="/voucher"
-            title="Power Entry (Ctrl+N)"
-            className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
-              collapsed ? 'justify-center px-0 py-2' : 'gap-2 px-3 py-2'
-            } ${
-              pathname === '/voucher'
-                ? 'bg-green-600 text-white'
-                : 'bg-slate-800 hover:bg-slate-700 text-green-400 border border-slate-700'
-            }`}>
-            <span>⌨</span>
-            {!collapsed && <><span>Power Entry</span><span className="ml-auto text-[10px] text-slate-500 font-mono">^N</span></>}
-          </Link>
         </div>
 
         {/* Grouped Nav */}
@@ -261,10 +240,12 @@ export default function AppShell({ tenantName, tenantId, userName, userRole, ena
             {collapsed && <div className="mx-3 my-1 border-t border-slate-800" />}
             {[
               { href: '/ledger-create', icon: '📝', label: 'Ledger Creation' },
-              { href: '/settings',      icon: '⚙️',  label: 'Settings' },
-              { href: '/users',         icon: '👤',  label: 'Users & Rights' },
               ...(userRole === 'owner' || userRole === 'superadmin'
-                ? [{ href: '/admin', icon: '🏢', label: 'Client Accounts' }]
+                ? [
+                    { href: '/settings', icon: '⚙️',  label: 'Settings' },
+                    { href: '/users',    icon: '👤',  label: 'Users & Rights' },
+                    { href: '/admin',    icon: '🏢',  label: 'Client Accounts' },
+                  ]
                 : []),
               { href: '/help',          icon: '❓',  label: 'Help & Support' },
             ].map(({ href, icon, label }) => (
@@ -287,22 +268,8 @@ export default function AppShell({ tenantName, tenantId, userName, userRole, ena
           </div>
         </nav>
 
-        {/* Footer: power mode + user + sign out */}
+        {/* Footer: user + sign out */}
         <div className={`border-t border-slate-800 space-y-2 ${collapsed ? 'px-1 py-3' : 'px-4 py-3'}`}>
-          <button
-            onClick={() => router.push('/voucher')}
-            title={collapsed ? 'Power Entry (Ctrl+M)' : undefined}
-            className={`w-full text-xs rounded-lg border font-mono transition-colors ${
-              collapsed ? 'px-0 py-1.5 flex items-center justify-center' : 'px-3 py-1.5'
-            } ${
-              powerMode
-                ? 'bg-green-900 border-green-700 text-green-400'
-                : 'border-slate-700 text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            {collapsed ? '⌨' : (powerMode ? '⌨ Power Mode ON' : '⌨ Power Mode (^M)')}
-          </button>
-
           {!collapsed && (
             <>
               <p className="text-slate-300 text-xs font-medium truncate">{userName}</p>
@@ -326,15 +293,13 @@ export default function AppShell({ tenantName, tenantId, userName, userRole, ena
 
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Top bar — hidden in power mode */}
-        {!isPowerMode && (
-          <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
-            <div className="text-xs text-slate-400 font-mono hidden sm:block">
-              Alt+1…9 jump tabs · Ctrl+\\ sidebar · Ctrl+N new voucher
-            </div>
-            <div className="flex items-center gap-3" />
-          </header>
-        )}
+        {/* Top bar */}
+        <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+          <div className="text-xs text-slate-400 font-mono hidden sm:block">
+            Alt+1…9 jump tabs · Ctrl+\\ sidebar · Ctrl+N new voucher
+          </div>
+          <div className="flex items-center gap-3" />
+        </header>
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">

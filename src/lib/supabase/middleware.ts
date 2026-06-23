@@ -62,7 +62,7 @@ export async function updateSession(request: NextRequest) {
       .eq('is_active', true)
     if (!count || count === 0) {
       const url = request.nextUrl.clone()
-      url.pathname = '/companies'
+      url.pathname = '/companies/new'
       return NextResponse.redirect(url)
     }
   }
