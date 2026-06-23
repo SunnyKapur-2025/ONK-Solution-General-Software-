@@ -1,0 +1,127 @@
+==============================
+  ONK Solution Security Audit
+==============================
+
+=== 1. Route Files ===
+/home/user/ONK-Solution-General-Software-/src/app/api/accounts/create/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/accounts/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/admin/clients/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/bank-recon/import/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/bank-recon/match/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/bank-recon/parse-pdf/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/dashboard/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/day-book/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/expenses/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/export/ledgers/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/export/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/gst/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/invoices/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/ledger/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/me/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/parties/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/payments/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/purchases/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/reports/aging/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/reports/pnl/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/sales/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/settings/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/users/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/api/vouchers/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/auth/callback/route.ts
+/home/user/ONK-Solution-General-Software-/src/app/auth/signout/route.ts
+
+=== 2. Middleware/Proxy ===
+PASS: proxy.ts exists
+PASS: updateSession called
+PASS: no conflicting middleware.ts
+
+=== 3. Auth Security ===
+-- Routes WITHOUT getUser() --
+  FAIL (no auth): /home/user/ONK-Solution-General-Software-/src/app/api/admin/clients/route.ts
+  FAIL (no auth): /home/user/ONK-Solution-General-Software-/src/app/api/bank-recon/parse-pdf/route.ts
+-- Routes taking tenantId from URL --
+-- Routes WITHOUT tenant_users lookup --
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/sales/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/purchases/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/users/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/parties/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/invoices/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/vouchers/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/export/ledgers/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/export/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/me/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/expenses/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/day-book/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/ledger/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/settings/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/gst/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/payments/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/reports/aging/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/reports/pnl/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/accounts/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/accounts/create/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/dashboard/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/bank-recon/match/route.ts
+  WARN (no tenant_users): /home/user/ONK-Solution-General-Software-/src/app/api/bank-recon/import/route.ts
+
+=== 4. Admin Routes ===
+  File: /home/user/ONK-Solution-General-Software-/src/app/api/admin/clients/route.ts
+    FAIL: no superadmin role check
+    FAIL: no auth check
+
+=== 5. Environment Variables ===
+PASS: .env.example exists
+PASS: no .env in root
+
+=== 6. Sensitive Data Exposure ===
+  PASS: no obvious secret logging
+
+=== 7. Input Validation (Zod) ===
+-- POST/PUT/PATCH routes without Zod --
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/sales/route.ts
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/admin/clients/route.ts
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/purchases/route.ts
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/users/route.ts
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/vouchers/route.ts
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/expenses/route.ts
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/settings/route.ts
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/payments/route.ts
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/accounts/create/route.ts
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/bank-recon/parse-pdf/route.ts
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/bank-recon/match/route.ts
+  WARN (no Zod): /home/user/ONK-Solution-General-Software-/src/app/api/bank-recon/import/route.ts
+
+=== 8. Error Handling ===
+
+=== 9. Admin Client Usage ===
+  CHECK: /home/user/ONK-Solution-General-Software-/src/app/api/admin/clients/route.ts:38
+  CHECK: /home/user/ONK-Solution-General-Software-/src/app/api/admin/clients/route.ts:132
+  CHECK: /home/user/ONK-Solution-General-Software-/src/app/api/users/route.ts:61
+
+=== 10. tenant_id Filter Check ===
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+grep: Unmatched ( or \(
+
+=== 11. TypeScript 'any' Usage ===
