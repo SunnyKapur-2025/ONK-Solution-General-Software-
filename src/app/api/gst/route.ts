@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 const GST_CODES: Record<string, string> = {
@@ -10,14 +10,21 @@ const GST_CODES: Record<string, string> = {
   '1652': 'inputIGST',
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const tenantId = req.nextUrl.searchParams.get('tenantId')
-    if (!tenantId) return NextResponse.json({ error: 'tenantId required' }, { status: 400 })
+    const { data: tenantUser } = await supabase
+      .from('tenant_users')
+      .select('tenant_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single()
+    if (!tenantUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const tenantId = tenantUser.tenant_id
 
     // Get GST account IDs
     const { data: accounts, error: accErr } = await supabase

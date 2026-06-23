@@ -55,7 +55,7 @@ export default function InvoicesPage() {
     if (!tenantId) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/invoices?tenantId=${tenantId}`)
+      const res = await fetch(`/api/invoices`)
       if (!res.ok) throw new Error((await res.json()).error)
       setInvoices(await res.json())
     } catch (e: unknown) {

@@ -38,7 +38,7 @@ export default function GstPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/gst?tenantId=${tenantId}`)
+      const res = await fetch(`/api/gst`)
       if (!res.ok) throw new Error((await res.json()).error)
       setData(await res.json())
     } catch (e: unknown) {
