@@ -59,18 +59,20 @@ export async function POST(req: NextRequest) {
     const industry = getIndustryById(industryId)
     if (!industry) return NextResponse.json({ error: 'Invalid industry' }, { status: 400 })
 
-    // Generate unique slug (check against existing slugs)
+    // Generate unique slug — append random suffix to avoid conflicts from
+    // prior partial creations that the user can't see due to RLS
     const baseSlug = slugify(name)
+    const rand = Math.random().toString(36).slice(2, 6)
     let slug = baseSlug
-    for (let i = 1; i <= 50; i++) {
+    for (let i = 1; i <= 10; i++) {
       const { data: existing } = await supabase
         .from('tenants')
         .select('id')
         .eq('slug', slug)
         .maybeSingle()
       if (!existing) break
-      slug = `${baseSlug}-${i}`
-      if (i === 50) return NextResponse.json({ error: 'Could not generate unique slug' }, { status: 500 })
+      slug = `${baseSlug}-${rand}-${i}`
+      if (i === 10) slug = `${baseSlug}-${Date.now()}`
     }
 
     const modules: ModuleKey[] = Array.from(
