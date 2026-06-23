@@ -53,13 +53,6 @@ const REPORTS: ReportCard[] = [
     icon: 'Receipt',
     color: 'purple',
   },
-  {
-    title: 'Export to Tally / Busy',
-    description: 'Export journal entries in XML format for Tally Prime or Busy Accounting.',
-    href: '/export',
-    icon: 'Download',
-    color: 'teal',
-  },
 ]
 
 const COLOR_CLASSES: Record<string, { bg: string; border: string; icon: string; btn: string }> = {

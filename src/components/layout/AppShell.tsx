@@ -10,15 +10,11 @@ import { MODULES } from '@/lib/modules'
 const NAV_ICONS: Record<string, string> = {
   dashboard:     '⬜',
   sales:         '🧾',
-  purchases:     '📦',
   expenses:      '💸',
-  income:        '📈',
   receipts:      '💰',
   payments:      '🏧',
   gst:           '📋',
-  tds:           '%',
   bank:          '🏦',
-  cash:          '💵',
   payroll:       '👥',
   attendance:    '📅',
   invoices:      '📄',
@@ -27,24 +23,15 @@ const NAV_ICONS: Record<string, string> = {
   aging:         '🕐',
   pnl:           '📊',
   balance_sheet: '📖',
-  cash_flow:     '🌊',
-  depreciation:  '📉',
-  loans:         '💳',
-  stock:         '📦',
-  assets:        '🏢',
   reports:       '🥧',
 }
 
 const MODULE_ROUTES: Partial<Record<ModuleKey, string>> = {
   dashboard:     '/dashboard',
   sales:         '/sales',
-  purchases:     '/purchases',
   expenses:      '/expenses',
-  income:        '/income',
   gst:           '/gst',
-  tds:           '/tds',
   bank:          '/bank',
-  cash:          '/cash',
   payroll:       '/payroll',
   attendance:    '/attendance',
   invoices:      '/invoices',
@@ -53,24 +40,18 @@ const MODULE_ROUTES: Partial<Record<ModuleKey, string>> = {
   aging:         '/aging',
   pnl:           '/pnl',
   balance_sheet: '/balance-sheet',
-  cash_flow:     '/cash-flow',
-  depreciation:  '/depreciation',
-  loans:         '/loans',
-  stock:         '/stock',
-  assets:        '/assets',
   reports:       '/reports',
 }
 
 // Grouped nav — order within each group follows business workflow
 const NAV_GROUPS: { label: string; keys: ModuleKey[] }[] = [
   { label: 'Overview',     keys: ['dashboard'] },
-  { label: 'Transactions', keys: ['sales', 'purchases', 'expenses', 'income', 'invoices'] },
+  { label: 'Transactions', keys: ['sales', 'expenses', 'invoices'] },
   { label: 'Parties',      keys: ['debtors', 'creditors', 'aging'] },
-  { label: 'Banking',      keys: ['bank', 'cash', 'loans'] },
-  { label: 'Compliance',   keys: ['gst', 'tds'] },
+  { label: 'Banking',      keys: ['bank'] },
+  { label: 'Compliance',   keys: ['gst'] },
   { label: 'Payroll',      keys: ['payroll', 'attendance'] },
-  { label: 'Assets',       keys: ['assets', 'depreciation', 'stock'] },
-  { label: 'Reports',      keys: ['pnl', 'balance_sheet', 'cash_flow', 'reports'] },
+  { label: 'Reports',      keys: ['pnl', 'balance_sheet', 'reports'] },
 ]
 
 interface Props {
@@ -351,14 +332,7 @@ export default function AppShell({ tenantName, tenantId, userName, userRole, ena
             <div className="text-xs text-slate-400 font-mono hidden sm:block">
               Alt+1…9 jump tabs · Ctrl+\\ sidebar · Ctrl+N new voucher
             </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/export"
-                className="text-xs text-slate-600 hover:text-slate-800 border border-slate-200 px-3 py-1.5 rounded-lg"
-              >
-                Export to Tally / Busy
-              </Link>
-            </div>
+            <div className="flex items-center gap-3" />
           </header>
         )}
 

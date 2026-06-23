@@ -13,7 +13,7 @@ async function requireSuperadmin() {
     .eq('user_id', user.id)
     .eq('is_active', true)
     .eq('role', 'superadmin')
-    .single()
+    .maybeSingle()
   return data ? user : null
 }
 

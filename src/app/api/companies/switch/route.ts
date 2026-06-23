@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
     const res = NextResponse.json({ ok: true, tenantId })
     res.cookies.set(ACTIVE_TENANT_COOKIE, tenantId, {
-      httpOnly: false,
+      httpOnly: true,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 365,
