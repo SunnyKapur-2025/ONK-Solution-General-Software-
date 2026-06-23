@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 interface Company {
   id: string
@@ -14,10 +14,10 @@ interface Company {
 }
 
 export default function CompaniesPage() {
-  const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
   const [switching, setSwitching] = useState<string | null>(null)
+  const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
     fetch('/api/companies')
@@ -33,8 +33,14 @@ export default function CompaniesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tenantId: id }),
     })
-    router.push('/dashboard')
-    router.refresh()
+    window.location.href = '/dashboard'
+  }
+
+  async function signOut() {
+    setSigningOut(true)
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.href = '/auth/login'
   }
 
   return (
@@ -42,16 +48,25 @@ export default function CompaniesPage() {
       <div className="max-w-3xl mx-auto px-4">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-slate-900">My companies</h1>
-          <Link href="/companies/new" className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-lg font-medium">
-            + Add company
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/companies/new" className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-lg font-medium">
+              + Add company
+            </Link>
+            <button
+              onClick={signOut}
+              disabled={signingOut}
+              className="text-sm border border-slate-300 hover:border-red-400 hover:text-red-600 text-slate-500 px-3.5 py-2 rounded-lg font-medium transition-colors"
+            >
+              {signingOut ? 'Signing out…' : '⏻ Sign out'}
+            </button>
+          </div>
         </div>
 
         {loading && <p className="text-slate-500 text-sm">Loading…</p>}
 
         {!loading && companies.length === 0 && (
           <div className="bg-white border border-slate-200 rounded-xl p-8 text-center">
-            <p className="text-slate-600 mb-4">You don&apos;t have any companies yet.</p>
+            <p className="text-slate-600 mb-4">No companies found. Create one to get started.</p>
             <Link href="/companies/new" className="inline-block bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium text-sm">
               Create your first company
             </Link>
