@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getActiveTenantUser } from '@/lib/active-tenant'
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,12 +8,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: tenantUser } = await supabase
-      .from('tenant_users')
-      .select('tenant_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single()
+    const tenantUser = await getActiveTenantUser(supabase, user.id)
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await req.json()

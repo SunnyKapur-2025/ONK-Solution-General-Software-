@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getActiveTenantUser } from '@/lib/active-tenant'
 
 // Map sub_type → Tally parent group
 const TALLY_GROUP_MAP: Record<string, string> = {
@@ -111,12 +112,7 @@ export async function GET(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: tenantUser } = await supabase
-      .from('tenant_users')
-      .select('tenant_id, tenants(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single()
+    const tenantUser = await getActiveTenantUser(supabase, user.id)
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
@@ -141,7 +137,7 @@ export async function GET(req: NextRequest) {
     const accounts = (data ?? []) as AccountRow[]
 
     // Resolve company name
-    const tenantRecord = tenantUser.tenants as { name?: string } | null
+    const { data: tenantRecord } = await supabase.from('tenants').select('name').eq('id', tenantUser.tenant_id).maybeSingle()
     const companyName = tenantRecord?.name ?? 'My Company'
 
     if (format === 'tally') {

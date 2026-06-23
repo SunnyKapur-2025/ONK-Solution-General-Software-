@@ -1,18 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getActiveTenantUser } from '@/lib/active-tenant'
 
 const DEBTORS_PARENT_CODE  = '1630'
 const CREDITORS_PARENT_CODE = '2100'
-
-async function getTenantId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase
-    .from('tenant_users')
-    .select('tenant_id')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .single()
-  return data?.tenant_id as string | undefined
-}
 
 async function nextLedgerCode(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -46,7 +37,8 @@ export async function GET() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const tenantId = await getTenantId(supabase, user.id)
+    const tenantUser = await getActiveTenantUser(supabase, user.id)
+    const tenantId = tenantUser?.tenant_id
     if (!tenantId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { data, error } = await supabase
@@ -68,7 +60,8 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const tenantId = await getTenantId(supabase, user.id)
+    const tenantUser = await getActiveTenantUser(supabase, user.id)
+    const tenantId = tenantUser?.tenant_id
     if (!tenantId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const body = await req.json()
