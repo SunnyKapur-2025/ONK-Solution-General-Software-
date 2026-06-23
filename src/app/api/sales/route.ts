@@ -17,21 +17,20 @@ const SYSTEM_CODES: Record<string, string> = {
 }
 
 async function resolveAccountId(
-  supabase: ReturnType<Awaited<ReturnType<typeof createClient>>['from']> extends never ? never : Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof createClient>>,
   tenantId: string,
   idOrCode: string
 ): Promise<string> {
-  // If it looks like a UUID, return as-is
   if (idOrCode.match(/^[0-9a-f-]{36}$/i)) return idOrCode
-  // If it's a system code alias, resolve to account code
   const code = SYSTEM_CODES[idOrCode] || idOrCode
   const { data } = await supabase
     .from('accounts')
     .select('id')
     .eq('tenant_id', tenantId)
     .eq('code', code)
-    .single()
-  return data?.id || idOrCode
+    .maybeSingle()
+  if (!data) throw new Error(`Account not found for code "${code}". Please create it in Settings > Chart of Accounts.`)
+  return data.id
 }
 
 export async function POST(req: NextRequest) {

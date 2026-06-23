@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       .select('tenant_id')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
 
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -46,23 +46,25 @@ export async function POST(req: NextRequest) {
         .select('id')
         .eq('tenant_id', tenantId)
         .eq('id', bankAccountId)
-        .single()
+        .maybeSingle()
       if (bankAcc) bankLedgerId = bankAcc.id
     }
 
     if (!bankLedgerId) {
-      // Fallback: use the first bank/current account
       const { data: bankAcc } = await supabase
         .from('accounts')
         .select('id')
         .eq('tenant_id', tenantId)
-        .ilike('name', '%bank%')
+        .eq('sub_type', 'bank')
         .limit(1)
-        .single()
+        .maybeSingle()
       if (bankAcc) bankLedgerId = bankAcc.id
     }
 
-    // Resolve suspense account — used for unidentified entries
+    if (!bankLedgerId) {
+      return NextResponse.json({ error: 'No bank account found. Please create one in Settings > Chart of Accounts.' }, { status: 400 })
+    }
+
     let suspenseId: string | null = null
     const { data: suspenseAcc } = await supabase
       .from('accounts')
@@ -70,7 +72,7 @@ export async function POST(req: NextRequest) {
       .eq('tenant_id', tenantId)
       .ilike('name', '%suspense%')
       .limit(1)
-      .single()
+      .maybeSingle()
     if (suspenseAcc) suspenseId = suspenseAcc.id
 
     // Get sequence starting point
