@@ -93,13 +93,13 @@ export default function AppShell({ tenantName, tenantId, userName, userRole, ena
     setSigningOut(true)
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.replace('/auth/login')
+    window.location.href = '/auth/login'
   }, [router])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       // Ctrl+M — toggle power mode
-      if (e.ctrlKey && e.key === 'm') { e.preventDefault(); setPowerMode(p => !p) }
+      if (e.ctrlKey && e.key === 'm') { e.preventDefault(); router.push('/voucher') }
       // Ctrl+N — new voucher
       if (e.ctrlKey && e.key === 'n') { e.preventDefault(); router.push('/voucher') }
       // Ctrl+\ — toggle sidebar
@@ -290,8 +290,8 @@ export default function AppShell({ tenantName, tenantId, userName, userRole, ena
         {/* Footer: power mode + user + sign out */}
         <div className={`border-t border-slate-800 space-y-2 ${collapsed ? 'px-1 py-3' : 'px-4 py-3'}`}>
           <button
-            onClick={() => setPowerMode(p => !p)}
-            title={collapsed ? 'Toggle Power Mode (Ctrl+M)' : undefined}
+            onClick={() => router.push('/voucher')}
+            title={collapsed ? 'Power Entry (Ctrl+M)' : undefined}
             className={`w-full text-xs rounded-lg border font-mono transition-colors ${
               collapsed ? 'px-0 py-1.5 flex items-center justify-center' : 'px-3 py-1.5'
             } ${

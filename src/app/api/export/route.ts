@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateTallyXml, TallyVoucher } from '@/lib/export/tally'
 import { generateBusyCsv, BusyVoucher } from '@/lib/export/busy'
+import { getActiveTenantUser } from '@/lib/active-tenant'
 
 const VOUCHER_TYPE_MAP: Record<string, string> = {
   sales:       'Sales',
@@ -29,16 +30,11 @@ export async function GET(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: tenantUser } = await supabase
-      .from('tenant_users')
-      .select('tenant_id, tenants(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single()
-
+    const tenantUser = await getActiveTenantUser(supabase, user.id)
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const companyName = (Array.isArray(tenantUser.tenants) ? tenantUser.tenants[0] : tenantUser.tenants as unknown as { name: string } | null)?.name || 'ONK Client'
+    const { data: tenantData } = await supabase.from('tenants').select('name').eq('id', tenantUser.tenant_id).maybeSingle()
+    const companyName = tenantData?.name || 'ONK Client'
 
     // Fetch journal entries with lines and accounts
     const { data: entries, error } = await supabase
