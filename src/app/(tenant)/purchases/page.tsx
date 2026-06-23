@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getActiveTenantUser } from '@/lib/active-tenant'
-import PaymentsPageClient from './PaymentsPageClient'
+import PurchasesPageClient from './PurchasesPageClient'
 
-export default async function PaymentsPage() {
+export default async function PurchasesPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
@@ -11,7 +11,7 @@ export default async function PaymentsPage() {
   const tenantUser = await getActiveTenantUser(supabase, user.id)
   if (!tenantUser) redirect('/auth/login')
 
-  const [creditorsRes, accountsRes, entriesRes] = await Promise.all([
+  const [vendorsRes, accountsRes, entriesRes] = await Promise.all([
     supabase
       .from('parties')
       .select('id, name')
@@ -31,15 +31,15 @@ export default async function PaymentsPage() {
       .from('journal_entries')
       .select('id, entry_number, entry_date, narration, status, created_at')
       .eq('tenant_id', tenantUser.tenant_id)
-      .eq('voucher_type', 'payment')
+      .eq('voucher_type', 'purchase')
       .order('entry_date', { ascending: false })
       .limit(50),
   ])
 
   return (
-    <PaymentsPageClient
+    <PurchasesPageClient
       tenantId={tenantUser.tenant_id}
-      creditors={creditorsRes.data ?? []}
+      vendors={vendorsRes.data ?? []}
       bankAccounts={accountsRes.data ?? []}
       recentEntries={entriesRes.data ?? []}
     />

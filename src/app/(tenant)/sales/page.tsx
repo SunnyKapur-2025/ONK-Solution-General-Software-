@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getActiveTenantUser } from '@/lib/active-tenant'
 import SalesPageClient from './SalesPageClient'
 
 export default async function SalesPage() {
@@ -7,13 +8,7 @@ export default async function SalesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: tenantUser } = await supabase
-    .from('tenant_users')
-    .select('tenant_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
+  const tenantUser = await getActiveTenantUser(supabase, user.id)
   if (!tenantUser) redirect('/auth/login')
 
   const [partiesRes, accountsRes, entriesRes] = await Promise.all([

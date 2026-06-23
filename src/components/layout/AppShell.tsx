@@ -10,6 +10,7 @@ import { MODULES } from '@/lib/modules'
 const NAV_ICONS: Record<string, string> = {
   dashboard:     '⬜',
   sales:         '🧾',
+  purchases:     '🛒',
   expenses:      '💸',
   receipts:      '💰',
   payments:      '🏧',
@@ -29,6 +30,7 @@ const NAV_ICONS: Record<string, string> = {
 const MODULE_ROUTES: Partial<Record<ModuleKey, string>> = {
   dashboard:     '/dashboard',
   sales:         '/sales',
+  purchases:     '/purchases',
   expenses:      '/expenses',
   gst:           '/gst',
   bank:          '/bank',
@@ -46,7 +48,7 @@ const MODULE_ROUTES: Partial<Record<ModuleKey, string>> = {
 // Grouped nav — order within each group follows business workflow
 const NAV_GROUPS: { label: string; keys: ModuleKey[] }[] = [
   { label: 'Overview',     keys: ['dashboard'] },
-  { label: 'Transactions', keys: ['sales', 'expenses', 'invoices'] },
+  { label: 'Transactions', keys: ['sales', 'purchases', 'expenses', 'invoices'] },
   { label: 'Parties',      keys: ['debtors', 'creditors', 'aging'] },
   { label: 'Banking',      keys: ['bank'] },
   { label: 'Compliance',   keys: ['gst'] },

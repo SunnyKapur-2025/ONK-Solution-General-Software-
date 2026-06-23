@@ -8,7 +8,7 @@ const SYSTEM_CODES: Record<string, string> = {
 }
 
 async function resolveAccountId(
-  supabase: ReturnType<Awaited<ReturnType<typeof createClient>>['from']> extends never ? never : Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof createClient>>,
   tenantId: string,
   idOrCode: string
 ): Promise<string> {
@@ -19,8 +19,9 @@ async function resolveAccountId(
     .select('id')
     .eq('tenant_id', tenantId)
     .eq('code', code)
-    .single()
-  return data?.id || idOrCode
+    .maybeSingle()
+  if (!data) throw new Error(`Account not found for code "${code}". Please create it in Settings > Chart of Accounts.`)
+  return data.id
 }
 
 export async function POST(req: NextRequest) {
