@@ -16,7 +16,6 @@ function parseAmount(s: string): number {
   return parseFloat(s.replace(/INR\s*/gi, '').replace(/[,\s]/g, '').trim()) || 0
 }
 
-// ── Date normalizers ──────────────────────────────────────────────────────────
 const MON_MAP: Record<string, string> = {
   jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06',
   jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12',
@@ -24,11 +23,9 @@ const MON_MAP: Record<string, string> = {
 
 function normalizeDate(raw: string): string {
   raw = raw.trim()
-  // DD Mon YYYY  →  YYYY-MM-DD
-  const m1 = raw.match(/^(\d{1,2})[\/\-\s]+([A-Za-z]{3})[\/\-\s]+(\d{4})/)
+  const m1 = raw.match(/(\d{1,2})[\/\-\s]+([A-Za-z]{3})[\/\-\s]+(\d{4})/)
   if (m1) return `${m1[3]}-${MON_MAP[m1[2].toLowerCase()] ?? '01'}-${m1[1].padStart(2,'0')}`
-  // DD/MM/YYYY or DD-MM-YYYY
-  const m2 = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/)
+  const m2 = raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/)
   if (m2) {
     const yr = m2[3].length === 2 ? '20' + m2[3] : m2[3]
     return `${yr}-${m2[2].padStart(2,'0')}-${m2[1].padStart(2,'0')}`
@@ -36,7 +33,6 @@ function normalizeDate(raw: string): string {
   return raw
 }
 
-// ── Bank format detection ─────────────────────────────────────────────────────
 function detectBank(text: string): string {
   const t = text.toLowerCase()
   if (t.includes('hdfc bank')) return 'hdfc'
@@ -51,13 +47,21 @@ function detectBank(text: string): string {
   return 'generic'
 }
 
-// ── Generic block-based parser (works for most Indian banks) ─────────────────
-const DATE_DDMONYYYY = /^\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}/i
-const DATE_NUMERIC   = /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/
-const AMOUNT_RE      = /(?:INR\s*|Rs\.?\s*)?[\d,]+\.\d{2}/gi
+// Matches date ANYWHERE in a line (not just at start)
+const DATE_DDMONYYYY_ANY = /\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}/i
+const DATE_NUMERIC_ANY   = /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/
+const AMOUNT_RE          = /(?:INR\s*|Rs\.?\s*)?[\d,]+\.\d{2}/gi
+
+function findDateInLine(line: string): string | null {
+  const m1 = line.match(DATE_DDMONYYYY_ANY)
+  if (m1) return m1[0]
+  const m2 = line.match(DATE_NUMERIC_ANY)
+  if (m2) return m2[0]
+  return null
+}
 
 function isDateLine(line: string): boolean {
-  return DATE_DDMONYYYY.test(line) || DATE_NUMERIC.test(line)
+  return findDateInLine(line) !== null
 }
 
 function extractAmounts(text: string): number[] {
@@ -65,6 +69,7 @@ function extractAmounts(text: string): number[] {
   return matches.map(parseAmount).filter(v => v > 0)
 }
 
+// ── Parser 1: block-based (lines grouped by date) ────────────────────────────
 function parseGeneric(text: string): BankTransaction[] {
   const rawLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
   const transactions: BankTransaction[] = []
@@ -84,17 +89,16 @@ function parseGeneric(text: string): BankTransaction[] {
 
   for (const block of blocks) {
     const fullText = block.join(' ')
-
-    const dateMatch = block[0].match(/\d{1,2}\s+[A-Za-z]{3}\s+\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/)
-    if (!dateMatch) continue
-    const date = normalizeDate(dateMatch[0])
+    const dateRaw = findDateInLine(block[0])
+    if (!dateRaw) continue
+    const date = normalizeDate(dateRaw)
 
     const amounts = extractAmounts(fullText)
     if (amounts.length === 0) continue
 
     const desc = fullText
-      .replace(/\d{1,2}\s+[A-Za-z]{3}\s+\d{4}/gi, '')
-      .replace(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/g, '')
+      .replace(DATE_DDMONYYYY_ANY, '')
+      .replace(DATE_NUMERIC_ANY, '')
       .replace(/(?:INR\s*|Rs\.?\s*)[\d,]+\.\d{2}/gi, '')
       .replace(/[\d,]+\.\d{2}/g, '')
       .replace(/\s*-\s*/g, ' ')
@@ -102,6 +106,7 @@ function parseGeneric(text: string): BankTransaction[] {
       .trim()
       .slice(0, 120)
 
+    // Check for empty-column dash markers
     const isDebitEmpty  = fullText.match(/\s-\s+(?:INR\s*)?[\d,]+\.\d{2}\s+(?:INR\s*)?[\d,]/i) !== null
     const isCreditEmpty = fullText.match(/(?:INR\s*)?[\d,]+\.\d{2}\s+-\s+(?:INR\s*)?[\d,]/i) !== null
 
@@ -117,9 +122,9 @@ function parseGeneric(text: string): BankTransaction[] {
       balance = amounts[0]
     }
 
-    // Keyword-based heuristic
+    // Keyword heuristic
     if (debit === 0 && credit === 0 && amounts.length > 0) {
-      if (/TRANSFER FROM|NEFT.*(?:CR|CREDIT)|RTGS.*(?:CR|CREDIT)|UPI.*(?:CR|CREDIT|RCV|RECEIVED)|RECEIPT|REFUND|INT PAID|BY TRANSFER|CR INTEREST/i.test(fullText)) {
+      if (/TRANSFER FROM|NEFT.*(?:CR|CREDIT)|RTGS.*(?:CR|CREDIT)|UPI.*(?:CR|CREDIT|RCV|RECEIVED)|RECEIPT|REFUND|INT PAID|BY TRANSFER|CR INTEREST|SALARY CR/i.test(fullText)) {
         credit = amounts[0]
       } else {
         debit = amounts[0]
@@ -133,29 +138,23 @@ function parseGeneric(text: string): BankTransaction[] {
   return transactions
 }
 
-// ── Table-style parser for HDFC / Axis / Kotak / SBI PDF text ────────────────
-// These banks produce cleaner columnar text. Each row is a single line like:
-//   03/06/2025  NEFT CR-123456-...-Client  50000.00  -  1234567.00
-// Columns: Date | Description | Debit | Credit | Balance
+// ── Parser 2: single-line tabular (HDFC, SBI, Axis etc.) ────────────────────
 function parseTabular(text: string): BankTransaction[] {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
   const transactions: BankTransaction[] = []
 
   for (const line of lines) {
-    if (!isDateLine(line)) continue
+    const dateRaw = findDateInLine(line)
+    if (!dateRaw) continue
     const amounts = extractAmounts(line)
     if (amounts.length < 2) continue
 
-    const dateMatch = line.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3}\s+\d{4}/)
-    if (!dateMatch) continue
-
-    const date = normalizeDate(dateMatch[0])
+    const date = normalizeDate(dateRaw)
     const balance = amounts[amounts.length - 1]
 
-    const isCreditLine = /\bCR\b|CREDIT|RECEIVED|REFUND|DEPOSIT|SALARY CREDIT|NEFT CR|IMPS CR|UPI CR/i.test(line)
+    const isCreditLine = /\bCR\b|CREDIT|RECEIVED|REFUND|DEPOSIT|NEFT CR|IMPS CR|UPI CR|SALARY CR/i.test(line)
 
     let debit = 0, credit = 0
-
     if (amounts.length >= 3) {
       debit = amounts[0]; credit = amounts[1]
     } else if (amounts.length === 2) {
@@ -164,8 +163,8 @@ function parseTabular(text: string): BankTransaction[] {
     }
 
     const desc = line
-      .replace(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/g, '')
-      .replace(/\d{1,2}\s+[A-Za-z]{3}\s+\d{4}/gi, '')
+      .replace(DATE_DDMONYYYY_ANY, '')
+      .replace(DATE_NUMERIC_ANY, '')
       .replace(/(?:INR\s*|Rs\.?\s*)[\d,]+\.\d{2}/gi, '')
       .replace(/[\d,]+\.\d{2}/g, '')
       .replace(/\s{2,}/g, ' ')
@@ -179,22 +178,81 @@ function parseTabular(text: string): BankTransaction[] {
   return transactions
 }
 
-function parsePdfText(text: string): BankTransaction[] {
-  const bank = detectBank(text)
+// ── Parser 3: merged-lines approach (join all lines, split on date boundaries) ─
+// Handles PDFs where pdf-parse merges page columns or reorders content
+function parseMergedLines(text: string): BankTransaction[] {
+  // Replace newlines with spaces, then split on date pattern boundaries
+  const merged = text.replace(/\n+/g, ' ').replace(/\s{3,}/g, '  ')
 
-  let results: BankTransaction[] = []
-
-  // Try block parser first (works for Indian Bank, PNB, BoB, Canara)
-  results = parseGeneric(text)
-
-  // If block parser found very few items, try tabular (HDFC, ICICI, SBI, Axis, Kotak)
-  if (results.length < 2) {
-    const tabular = parseTabular(text)
-    if (tabular.length > results.length) results = tabular
+  // Find all date positions
+  const datePattern = /(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/gi
+  const matches: Array<{ index: number; date: string }> = []
+  let m
+  while ((m = datePattern.exec(merged)) !== null) {
+    matches.push({ index: m.index, date: m[1] })
   }
 
-  void bank // used implicitly via text detection
-  return results
+  if (matches.length === 0) return []
+
+  const transactions: BankTransaction[] = []
+
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index
+    const end = matches[i + 1]?.index ?? merged.length
+    const segment = merged.slice(start, end)
+
+    const amounts = extractAmounts(segment)
+    if (amounts.length === 0) continue
+
+    const date = normalizeDate(matches[i].date)
+
+    const desc = segment
+      .replace(DATE_DDMONYYYY_ANY, '')
+      .replace(DATE_NUMERIC_ANY, '')
+      .replace(/(?:INR\s*|Rs\.?\s*)[\d,]+\.\d{2}/gi, '')
+      .replace(/[\d,]+\.\d{2}/g, '')
+      .replace(/\s*-\s*/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .slice(0, 120)
+
+    const isDebitEmpty = segment.match(/\s-\s+(?:INR\s*)?[\d,]+\.\d{2}/i) !== null
+    let debit = 0, credit = 0, balance = 0
+
+    if (amounts.length >= 3) {
+      debit = amounts[0]; credit = amounts[1]; balance = amounts[2]
+    } else if (amounts.length === 2) {
+      balance = amounts[1]
+      if (isDebitEmpty) credit = amounts[0]
+      else debit = amounts[0]
+    } else {
+      balance = amounts[0]
+    }
+
+    if (debit === 0 && credit === 0 && amounts.length > 0) {
+      if (/TRANSFER FROM|NEFT.*(?:CR|CREDIT)|RTGS.*(?:CR|CREDIT)|UPI.*(?:CR|RECEIVED)|RECEIPT|REFUND|INT PAID|CR INTEREST|SALARY CR/i.test(segment)) {
+        credit = amounts[0]
+      } else {
+        debit = amounts[0]
+      }
+    }
+
+    if (debit === 0 && credit === 0) continue
+    transactions.push({ date, description: desc || 'Transaction', debit, credit, balance })
+  }
+
+  return transactions
+}
+
+function parsePdfText(text: string): BankTransaction[] {
+  // Try all three parsers, pick the one that finds the most transactions
+  const results = [
+    parseGeneric(text),
+    parseTabular(text),
+    parseMergedLines(text),
+  ]
+  results.sort((a, b) => b.length - a.length)
+  return results[0]
 }
 
 export async function POST(req: NextRequest) {
@@ -224,6 +282,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           error: 'PDF text extraction failed on this server. Please download your bank statement as CSV from net banking instead.',
           transactions: [],
+          rawPreview: '',
         })
       }
       throw pdfErr
@@ -236,7 +295,8 @@ export async function POST(req: NextRequest) {
       transactions,
       pageCount,
       bank,
-      rawPreview: pdfText.slice(0, 300),
+      // Return first 800 chars of extracted text so the UI can show it for debugging
+      rawPreview: pdfText.slice(0, 800),
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'PDF parsing failed'

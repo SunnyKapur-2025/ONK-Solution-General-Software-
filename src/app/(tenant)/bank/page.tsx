@@ -166,6 +166,7 @@ function UploadTab() {
   const [step, setStep] = useState<'upload' | 'categorize' | 'done'>('upload')
   const [parsePdfLoading, setParsePdfLoading] = useState(false)
   const [parsePdfError, setParsePdfError] = useState('')
+  const [rawPreview, setRawPreview] = useState('')
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ count: number; suspenseCount: number } | null>(null)
   const [importError, setImportError] = useState('')
@@ -485,7 +486,16 @@ function UploadTab() {
             Text-based PDF from net banking will be parsed automatically. Works with Indian Bank, HDFC, ICICI, SBI, Axis, Kotak and most others.
           </p>
           {parsePdfError && (
-            <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{parsePdfError}</p>
+            <div className="mb-3">
+              <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{parsePdfError}</p>
+              {rawPreview && (
+                <div className="mt-2">
+                  <p className="text-xs font-medium text-slate-600 mb-1">Extracted text (first 800 chars):</p>
+                  <pre className="text-xs text-slate-700 bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">{rawPreview}</pre>
+                  <p className="text-xs text-slate-500 mt-1">If the text looks readable but no transactions were found, please share this with support so the parser can be improved.</p>
+                </div>
+              )}
+            </div>
           )}
           <button
             disabled={parsePdfLoading}
@@ -500,8 +510,10 @@ function UploadTab() {
                 const data = await res.json()
                 if (!res.ok) throw new Error(data.error || 'Parsing failed')
                 if (!data.transactions || data.transactions.length === 0) {
-                  setParsePdfError('No transactions found. Your PDF may be image-based — try downloading a text-based statement from net banking.')
+                  setRawPreview(data.rawPreview || '')
+                  setParsePdfError('No transactions could be extracted. The text extracted from your PDF is shown below — if it looks garbled, the PDF may be image/scanned.')
                 } else {
+                  setRawPreview('')
                   setRawTxns(data.transactions)
                 }
               } catch (err: unknown) {
