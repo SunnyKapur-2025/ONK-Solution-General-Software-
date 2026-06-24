@@ -40,6 +40,20 @@ export default async function TenantLayout({ children }: { children: React.React
 
   const enabledModules = (modulesData ?? []).map((m) => m.module_key as ModuleKey)
 
+  // Auto-enable core modules if missing (self-healing for tenants created before modules were added)
+  const CORE_MODULES: ModuleKey[] = ['dashboard', 'sales', 'purchases', 'expenses', 'receipts', 'payments', 'bank', 'reports']
+  const missing = CORE_MODULES.filter(m => !enabledModules.includes(m))
+  if (missing.length > 0) {
+    const rows = missing.map(m => ({
+      tenant_id: active.tenant_id,
+      module_key: m,
+      is_enabled: true,
+      enabled_by: user.id,
+    }))
+    await supabase.from('tenant_modules').upsert(rows, { onConflict: 'tenant_id,module_key' })
+    enabledModules.push(...missing)
+  }
+
   const companies = memberships
     .map((m) => {
       const t = (Array.isArray(m.tenants) ? m.tenants[0] : m.tenants) as { id: string; name: string } | null
