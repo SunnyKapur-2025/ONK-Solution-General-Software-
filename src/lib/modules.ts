@@ -4,6 +4,8 @@ export const MODULES: Record<ModuleKey, ModuleMeta> = {
   sales:         { key: 'sales',         label: 'Sales',            description: 'Sales invoices and receipts',              icon: 'ShoppingCart' },
   purchases:     { key: 'purchases',     label: 'Purchases',        description: 'Purchase bills and payments',               icon: 'Package' },
   expenses:      { key: 'expenses',      label: 'Expenses',         description: 'Business expense tracking',                 icon: 'Receipt' },
+  receipts:      { key: 'receipts',      label: 'Receipts',         description: 'Record money received from customers',      icon: 'ArrowDownCircle' },
+  payments:      { key: 'payments',      label: 'Payments',         description: 'Record money paid to vendors',              icon: 'ArrowUpCircle' },
   income:        { key: 'income',        label: 'Income',           description: 'Other income entries',                     icon: 'TrendingUp' },
   gst:           { key: 'gst',           label: 'GST',              description: 'GST filing and reconciliation',             icon: 'FileText' },
   tds:           { key: 'tds',           label: 'TDS',              description: 'TDS deduction and 26AS reconciliation',     icon: 'Percent' },

@@ -16,6 +16,8 @@ export type ModuleKey =
   | 'sales'
   | 'purchases'
   | 'expenses'
+  | 'receipts'
+  | 'payments'
   | 'income'
   | 'gst'
   | 'tds'

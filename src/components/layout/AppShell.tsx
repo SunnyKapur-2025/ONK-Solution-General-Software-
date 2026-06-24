@@ -33,6 +33,8 @@ const MODULE_ROUTES: Partial<Record<ModuleKey, string>> = {
   purchases:     '/purchases',
   expenses:      '/expenses',
   gst:           '/gst',
+  receipts:      '/receipts',
+  payments:      '/payments',
   bank:          '/bank',
   payroll:       '/payroll',
   attendance:    '/attendance',
@@ -48,7 +50,7 @@ const MODULE_ROUTES: Partial<Record<ModuleKey, string>> = {
 // Grouped nav — order within each group follows business workflow
 const NAV_GROUPS: { label: string; keys: ModuleKey[] }[] = [
   { label: 'Overview',     keys: ['dashboard'] },
-  { label: 'Transactions', keys: ['sales', 'purchases', 'expenses', 'invoices'] },
+  { label: 'Transactions', keys: ['sales', 'purchases', 'expenses', 'receipts', 'payments', 'invoices'] },
   { label: 'Parties',      keys: ['debtors', 'creditors', 'aging'] },
   { label: 'Banking',      keys: ['bank'] },
   { label: 'Compliance',   keys: ['gst'] },

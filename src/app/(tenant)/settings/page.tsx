@@ -2,6 +2,75 @@
 
 import { useEffect, useState, useRef } from 'react'
 import InvoiceTemplate from '@/components/invoice/InvoiceTemplate'
+import { MODULES, ALL_MODULE_KEYS } from '@/lib/modules'
+import { ModuleKey } from '@/types'
+
+function ModulesSection() {
+  const [moduleState, setModuleState] = useState<Record<string, boolean>>({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/modules')
+      .then(r => r.json())
+      .then(d => {
+        const state: Record<string, boolean> = {}
+        for (const m of d.modules ?? []) state[m.module_key] = m.is_enabled
+        setModuleState(state)
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function toggle(key: ModuleKey, enabled: boolean) {
+    setSaving(key)
+    try {
+      await fetch('/api/modules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moduleKey: key, enabled }),
+      })
+      setModuleState(s => ({ ...s, [key]: enabled }))
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  if (loading) return null
+
+  const displayKeys = ALL_MODULE_KEYS.filter(k =>
+    !['income', 'tds', 'cash', 'cash_flow', 'depreciation', 'loans', 'stock', 'assets'].includes(k)
+  )
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+      <div>
+        <h2 className="text-base font-semibold text-slate-800">Enabled Modules</h2>
+        <p className="text-xs text-slate-500 mt-0.5">Toggle which sections appear in the sidebar. Changes take effect on next page load.</p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {displayKeys.map(key => {
+          const mod = MODULES[key]
+          const enabled = !!moduleState[key]
+          return (
+            <label key={key} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${enabled ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-slate-50'}`}>
+              <input
+                type="checkbox"
+                checked={enabled}
+                disabled={saving === key}
+                onChange={e => toggle(key, e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+              />
+              <div>
+                <p className="text-sm font-medium text-slate-800">{mod.label}</p>
+                <p className="text-xs text-slate-500 leading-tight">{mod.description}</p>
+              </div>
+            </label>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 interface Settings {
   name: string
@@ -429,6 +498,9 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+
+      {/* Module Management */}
+      <ModulesSection />
 
       <div className="flex justify-end">
         <button

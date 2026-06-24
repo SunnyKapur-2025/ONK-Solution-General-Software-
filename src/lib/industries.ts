@@ -1,66 +1,69 @@
 import { Industry, ModuleKey } from '@/types'
 
+// Core modules every business needs
+const CORE: ModuleKey[] = ['dashboard', 'sales', 'purchases', 'expenses', 'receipts', 'payments', 'bank', 'reports']
+
 export const INDUSTRIES: Industry[] = [
   // ── Group A: Service Industry ──────────────────────────────────
   {
     id: 'bpo',
     label: 'BPO / Call Centre',
     group: 'service',
-    defaultModules: ['sales', 'expenses', 'gst', 'payroll', 'debtors', 'creditors', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'payroll', 'debtors', 'creditors', 'pnl'],
   },
   {
     id: 'manpower',
     label: 'Manpower / Staffing Agency',
     group: 'service',
-    defaultModules: ['sales', 'expenses', 'gst', 'attendance', 'payroll', 'invoices', 'debtors', 'creditors', 'aging', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'attendance', 'payroll', 'invoices', 'debtors', 'creditors', 'aging', 'pnl'],
   },
   {
     id: 'security',
     label: 'Security Agency',
     group: 'service',
-    defaultModules: ['sales', 'expenses', 'gst', 'attendance', 'payroll', 'invoices', 'debtors', 'creditors', 'aging', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'attendance', 'payroll', 'invoices', 'debtors', 'creditors', 'aging', 'pnl'],
   },
   {
     id: 'housekeeping',
     label: 'Housekeeping / Facility Management',
     group: 'service',
-    defaultModules: ['sales', 'expenses', 'gst', 'attendance', 'payroll', 'invoices', 'debtors', 'creditors', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'attendance', 'payroll', 'invoices', 'debtors', 'creditors', 'pnl'],
   },
   {
     id: 'freight',
     label: 'Freight & Forwarding',
     group: 'service',
-    defaultModules: ['sales', 'expenses', 'gst', 'bank', 'debtors', 'creditors', 'aging', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'creditors', 'aging', 'pnl'],
   },
   {
     id: 'courier',
     label: 'Courier & Logistics',
     group: 'service',
-    defaultModules: ['sales', 'expenses', 'gst', 'debtors', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'pnl'],
   },
   {
     id: 'event',
     label: 'Event Management',
     group: 'service',
-    defaultModules: ['sales', 'expenses', 'gst', 'debtors', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'pnl'],
   },
   {
     id: 'advertising',
     label: 'Advertising & PR Agency',
     group: 'service',
-    defaultModules: ['sales', 'expenses', 'gst', 'debtors', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'pnl'],
   },
   {
     id: 'consulting',
     label: 'Consulting / Advisory Firm',
     group: 'service',
-    defaultModules: ['sales', 'expenses', 'gst', 'debtors', 'pnl', 'balance_sheet', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'pnl', 'balance_sheet'],
   },
   {
     id: 'it_services',
     label: 'IT Services & Software Company',
     group: 'service',
-    defaultModules: ['sales', 'expenses', 'gst', 'debtors', 'pnl', 'balance_sheet', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'invoices', 'debtors', 'pnl', 'balance_sheet'],
   },
 
   // ── Group B: Trading ───────────────────────────────────────────
@@ -68,25 +71,25 @@ export const INDUSTRIES: Industry[] = [
     id: 'general_trading',
     label: 'General Trading',
     group: 'trading',
-    defaultModules: ['sales', 'expenses', 'gst', 'debtors', 'creditors', 'aging', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'creditors', 'aging', 'pnl'],
   },
   {
     id: 'import_export',
     label: 'Import / Export',
     group: 'trading',
-    defaultModules: ['sales', 'expenses', 'gst', 'bank', 'debtors', 'creditors', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'creditors', 'pnl'],
   },
   {
     id: 'wholesale',
     label: 'Wholesale Distribution',
     group: 'trading',
-    defaultModules: ['sales', 'gst', 'debtors', 'creditors', 'aging', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'invoices', 'debtors', 'creditors', 'aging', 'pnl'],
   },
   {
     id: 'retail',
     label: 'Retail Shop',
     group: 'trading',
-    defaultModules: ['sales', 'gst', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'pnl'],
   },
 
   // ── Group C: Professional Services ────────────────────────────
@@ -94,37 +97,37 @@ export const INDUSTRIES: Industry[] = [
     id: 'ca_firm',
     label: 'CA / CS / Tax Firm',
     group: 'professional',
-    defaultModules: ['sales', 'expenses', 'gst', 'debtors', 'pnl', 'balance_sheet', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'invoices', 'debtors', 'pnl', 'balance_sheet'],
   },
   {
     id: 'legal',
     label: 'Legal Firm',
     group: 'professional',
-    defaultModules: ['sales', 'expenses', 'debtors', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'invoices', 'debtors', 'pnl'],
   },
   {
     id: 'healthcare',
     label: 'Healthcare / Clinic',
     group: 'professional',
-    defaultModules: ['sales', 'expenses', 'gst', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'pnl'],
   },
   {
     id: 'education',
     label: 'Education / Coaching',
     group: 'professional',
-    defaultModules: ['sales', 'expenses', 'gst', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'pnl'],
   },
   {
     id: 'real_estate',
     label: 'Real Estate / Builder',
     group: 'professional',
-    defaultModules: ['sales', 'gst', 'debtors', 'creditors', 'pnl', 'balance_sheet', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'creditors', 'pnl', 'balance_sheet'],
   },
   {
     id: 'hospitality',
     label: 'Hotel / Restaurant',
     group: 'professional',
-    defaultModules: ['sales', 'gst', 'payroll', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'payroll', 'pnl'],
   },
 
   // ── Group D: Manufacturing & Construction ─────────────────────
@@ -132,19 +135,19 @@ export const INDUSTRIES: Industry[] = [
     id: 'manufacturing',
     label: 'Small Manufacturer',
     group: 'manufacturing',
-    defaultModules: ['sales', 'gst', 'debtors', 'creditors', 'pnl', 'balance_sheet', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'creditors', 'pnl', 'balance_sheet'],
   },
   {
     id: 'contractor',
     label: 'Civil Contractor',
     group: 'manufacturing',
-    defaultModules: ['sales', 'gst', 'debtors', 'creditors', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'creditors', 'pnl'],
   },
   {
     id: 'interior',
     label: 'Interior Designer',
     group: 'manufacturing',
-    defaultModules: ['sales', 'gst', 'debtors', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'pnl'],
   },
 
   // ── Group E: Finance & Others ──────────────────────────────────
@@ -152,25 +155,25 @@ export const INDUSTRIES: Industry[] = [
     id: 'nbfc',
     label: 'NBFC / Microfinance',
     group: 'finance',
-    defaultModules: ['expenses', 'pnl', 'balance_sheet', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'pnl', 'balance_sheet'],
   },
   {
     id: 'insurance',
     label: 'Insurance Agency',
     group: 'finance',
-    defaultModules: ['expenses', 'gst', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'gst', 'pnl'],
   },
   {
     id: 'ngo',
     label: 'NGO / Trust',
     group: 'finance',
-    defaultModules: ['expenses', 'bank', 'pnl', 'balance_sheet', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'pnl', 'balance_sheet'],
   },
   {
     id: 'society',
     label: 'Society / RWA',
     group: 'finance',
-    defaultModules: ['expenses', 'bank', 'pnl', 'dashboard', 'reports'],
+    defaultModules: [...CORE, 'pnl'],
   },
 ]
 
