@@ -13,6 +13,13 @@ type Invoice = {
   narration: string
 }
 
+type EditForm = {
+  entry_number: string
+  entry_date: string
+  reference: string
+  narration: string
+}
+
 const GST_RATES = [0, 5, 12, 18, 28]
 
 export default function InvoicesPage() {
@@ -24,6 +31,14 @@ export default function InvoicesPage() {
   const [submitError, setSubmitError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
+
+  // Edit/delete state
+  const [editInvoice, setEditInvoice] = useState<Invoice | null>(null)
+  const [editForm, setEditForm] = useState<EditForm>({ entry_number: '', entry_date: '', reference: '', narration: '' })
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Form state
   const [form, setForm] = useState({
@@ -116,8 +131,104 @@ export default function InvoicesPage() {
     }
   }
 
+  function openEdit(inv: Invoice) {
+    setEditInvoice(inv)
+    setEditForm({ entry_number: inv.invoiceNumber, entry_date: inv.date, reference: inv.customer, narration: inv.narration })
+    setEditError('')
+  }
+
+  async function saveEdit() {
+    if (!editInvoice) return
+    setEditSaving(true)
+    setEditError('')
+    try {
+      const res = await fetch(`/api/invoices/${editInvoice.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      setEditInvoice(null)
+      await loadInvoices()
+    } catch (e: unknown) {
+      setEditError(e instanceof Error ? e.message : 'Failed to save')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  async function confirmDelete(id: string) {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error((await res.json()).error)
+      setDeleteConfirmId(null)
+      await loadInvoices()
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed to delete')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto py-8 px-6 space-y-6">
+      {/* Edit modal */}
+      {editInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setEditInvoice(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-slate-800 mb-4">Edit Invoice</h2>
+            {editError && <p className="text-red-600 text-sm mb-3">{editError}</p>}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Invoice Number</label>
+                <input value={editForm.entry_number} onChange={e => setEditForm(f => ({ ...f, entry_number: e.target.value }))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Date</label>
+                <input type="date" value={editForm.entry_date} onChange={e => setEditForm(f => ({ ...f, entry_date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Customer / Reference</label>
+                <input value={editForm.reference} onChange={e => setEditForm(f => ({ ...f, reference: e.target.value }))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Narration</label>
+                <textarea rows={2} value={editForm.narration} onChange={e => setEditForm(f => ({ ...f, narration: e.target.value }))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={saveEdit} disabled={editSaving}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                {editSaving ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button onClick={() => setEditInvoice(null)} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm hover:bg-slate-50">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setDeleteConfirmId(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-slate-800 mb-2">Delete Invoice?</h2>
+            <p className="text-sm text-slate-500 mb-5">This will permanently delete the invoice and its journal entries. This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => confirmDelete(deleteConfirmId)} disabled={deleting}
+                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+              <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm hover:bg-slate-50">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Invoices</h1>
@@ -159,7 +270,7 @@ export default function InvoicesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    {['Invoice #', 'Date', 'Customer', 'Amount', 'Status'].map((h) => (
+                    {['Invoice #', 'Date', 'Customer', 'Amount', 'Status', 'Actions'].map((h) => (
                       <th key={h} className="px-5 py-3 text-left font-medium text-slate-600">{h}</th>
                     ))}
                   </tr>
@@ -177,6 +288,12 @@ export default function InvoicesPage() {
                         }`}>
                           {inv.status}
                         </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => openEdit(inv)} className="text-blue-600 hover:underline text-xs font-medium">Edit</button>
+                          <button onClick={() => setDeleteConfirmId(inv.id)} className="text-red-500 hover:underline text-xs font-medium">Delete</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
