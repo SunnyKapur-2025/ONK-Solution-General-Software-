@@ -200,6 +200,8 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const [showPreview, setShowPreview] = useState(false)
+  const [seeding, setSeeding] = useState(false)
+  const [seedMsg, setSeedMsg] = useState('')
 
   useEffect(() => {
     fetch('/api/settings')
@@ -331,6 +333,22 @@ export default function SettingsPage() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
       </div>
     )
+  }
+
+  async function seedDemo() {
+    if (!confirm('This will add sample journal entries (invoices, purchases, payroll, etc.) to your company. Continue?')) return
+    setSeeding(true)
+    setSeedMsg('')
+    try {
+      const res = await fetch('/api/seed-demo', { method: 'POST' })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      setSeedMsg(`✓ Demo data loaded — ${d.created} journal entries created.`)
+    } catch (e: unknown) {
+      setSeedMsg('✗ ' + (e instanceof Error ? e.message : 'Failed to seed demo data'))
+    } finally {
+      setSeeding(false)
+    }
   }
 
   return (
@@ -501,6 +519,24 @@ export default function SettingsPage() {
 
       {/* Module Management */}
       <ModulesSection />
+
+      {/* Demo Data */}
+      <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-800">Demo Data</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Load sample transactions (invoices, purchases, salary, etc.) to explore the software with realistic data.</p>
+        </div>
+        {seedMsg && (
+          <p className={`text-sm rounded-lg px-3 py-2 ${seedMsg.startsWith('✓') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{seedMsg}</p>
+        )}
+        <button
+          onClick={seedDemo}
+          disabled={seeding}
+          className="bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+        >
+          {seeding ? 'Loading…' : '⚡ Load Demo Data'}
+        </button>
+      </div>
 
       <div className="flex justify-end">
         <button

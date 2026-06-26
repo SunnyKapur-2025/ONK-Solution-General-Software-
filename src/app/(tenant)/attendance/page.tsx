@@ -64,7 +64,7 @@ export default function AttendancePage() {
       </div>
 
       <p className="mt-4 text-xs text-slate-400 text-center">
-        Attendance module coming soon — records will feed into payroll calculation
+        Mark attendance daily. Monthly summary feeds into payroll calculation.
       </p>
     </div>
   )
