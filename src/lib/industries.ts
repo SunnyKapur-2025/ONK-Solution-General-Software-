@@ -15,25 +15,25 @@ export const INDUSTRIES: Industry[] = [
     id: 'manpower',
     label: 'Manpower / Staffing Agency',
     group: 'service',
-    defaultModules: [...CORE, 'gst', 'attendance', 'payroll', 'invoices', 'debtors', 'creditors', 'aging', 'pnl'],
+    defaultModules: [...CORE, 'gst', 'attendance', 'payroll', 'debtors', 'creditors', 'pnl'],
   },
   {
     id: 'security',
     label: 'Security Agency',
     group: 'service',
-    defaultModules: [...CORE, 'gst', 'attendance', 'payroll', 'invoices', 'debtors', 'creditors', 'aging', 'pnl'],
+    defaultModules: [...CORE, 'gst', 'attendance', 'payroll', 'debtors', 'creditors', 'pnl'],
   },
   {
     id: 'housekeeping',
     label: 'Housekeeping / Facility Management',
     group: 'service',
-    defaultModules: [...CORE, 'gst', 'attendance', 'payroll', 'invoices', 'debtors', 'creditors', 'pnl'],
+    defaultModules: [...CORE, 'gst', 'attendance', 'payroll', 'debtors', 'creditors', 'pnl'],
   },
   {
     id: 'freight',
     label: 'Freight & Forwarding',
     group: 'service',
-    defaultModules: [...CORE, 'gst', 'debtors', 'creditors', 'aging', 'pnl'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'creditors', 'pnl'],
   },
   {
     id: 'courier',
@@ -63,7 +63,7 @@ export const INDUSTRIES: Industry[] = [
     id: 'it_services',
     label: 'IT Services & Software Company',
     group: 'service',
-    defaultModules: [...CORE, 'gst', 'invoices', 'debtors', 'pnl', 'balance_sheet'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'pnl', 'balance_sheet'],
   },
 
   // ── Group B: Trading ───────────────────────────────────────────
@@ -71,7 +71,7 @@ export const INDUSTRIES: Industry[] = [
     id: 'general_trading',
     label: 'General Trading',
     group: 'trading',
-    defaultModules: [...CORE, 'gst', 'debtors', 'creditors', 'aging', 'pnl'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'creditors', 'pnl'],
   },
   {
     id: 'import_export',
@@ -83,7 +83,7 @@ export const INDUSTRIES: Industry[] = [
     id: 'wholesale',
     label: 'Wholesale Distribution',
     group: 'trading',
-    defaultModules: [...CORE, 'gst', 'invoices', 'debtors', 'creditors', 'aging', 'pnl'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'creditors', 'pnl'],
   },
   {
     id: 'retail',
@@ -97,13 +97,13 @@ export const INDUSTRIES: Industry[] = [
     id: 'ca_firm',
     label: 'CA / CS / Tax Firm',
     group: 'professional',
-    defaultModules: [...CORE, 'gst', 'invoices', 'debtors', 'pnl', 'balance_sheet'],
+    defaultModules: [...CORE, 'gst', 'debtors', 'pnl', 'balance_sheet'],
   },
   {
     id: 'legal',
     label: 'Legal Firm',
     group: 'professional',
-    defaultModules: [...CORE, 'invoices', 'debtors', 'pnl'],
+    defaultModules: [...CORE, 'debtors', 'pnl'],
   },
   {
     id: 'healthcare',

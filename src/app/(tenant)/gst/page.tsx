@@ -1,7 +1,23 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { formatCurrency } from '@/lib/utils'
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+type GSTTransaction = {
+  id: string
+  date: string
+  invoiceNumber: string
+  party: string
+  type: 'B2B' | 'B2C' | 'purchase'
+  taxableAmount: number
+  cgst: number
+  sgst: number
+  igst: number
+  total: number
+  direction: 'output' | 'input'
+}
 
 type MonthGST = {
   month: string
@@ -12,325 +28,427 @@ type MonthGST = {
   inputSGST: number
   inputIGST: number
   netPayable: number
+  transactions?: GSTTransaction[]
 }
 
+// ─── CSV helpers ─────────────────────────────────────────────────────────────
+
+function toCSV(rows: Record<string, string | number>[]): string {
+  if (rows.length === 0) return ''
+  const headers = Object.keys(rows[0])
+  const escape = (v: string | number) => {
+    const s = String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"`
+      : s
+  }
+  return [
+    headers.join(','),
+    ...rows.map((r) => headers.map((h) => escape(r[h])).join(',')),
+  ].join('\n')
+}
+
+function downloadCSV(filename: string, csv: string) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Month / Year selector options ───────────────────────────────────────────
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+function buildYearOptions() {
+  const current = new Date().getFullYear()
+  return Array.from({ length: 5 }, (_, i) => current - i)
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function GstPage() {
-  const [data, setData] = useState<MonthGST[]>([])
+  const now = new Date()
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth()) // 0-indexed
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear())
+
+  const [allData, setAllData] = useState<MonthGST[]>([])
+  const [transactions, setTransactions] = useState<GSTTransaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [txLoading, setTxLoading] = useState(false)
   const [error, setError] = useState('')
-  const [tenantId, setTenantId] = useState<string | null>(null)
-  const [gstin, setGstin] = useState('')
-  const [gstinSaved, setGstinSaved] = useState(false)
-  const [gstr2bFile, setGstr2bFile] = useState<File | null>(null)
-  const [gstr2bImporting, setGstr2bImporting] = useState(false)
-  const [gstr2bMsg, setGstr2bMsg] = useState('')
-  const gstr2bRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    fetch('/api/me')
-      .then((r) => r.json())
-      .then((d) => setTenantId(d.tenantId))
-      .catch(() => setError('Failed to load tenant info'))
-  }, [])
+  const periodKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`
 
-  const loadGST = useCallback(async () => {
-    if (!tenantId) return
+  // ── Load aggregate GST summary ──────────────────────────────────────────────
+  const loadSummary = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/gst`)
-      if (!res.ok) throw new Error((await res.json()).error)
-      setData(await res.json())
+      const res = await fetch('/api/gst')
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to load GST data')
+      const json = await res.json()
+      setAllData(Array.isArray(json) ? json : [])
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load GST data')
     } finally {
       setLoading(false)
     }
-  }, [tenantId])
+  }, [])
 
-  useEffect(() => { if (tenantId) loadGST() }, [tenantId, loadGST])
+  // ── Load transactions for selected period ────────────────────────────────────
+  const loadTransactions = useCallback(async () => {
+    setTxLoading(true)
+    try {
+      const res = await fetch(`/api/gst?period=${periodKey}`)
+      if (!res.ok) throw new Error('Failed to load transactions')
+      const json = await res.json()
+      // Support both {transactions:[]} and flat array responses
+      const txList: GSTTransaction[] = Array.isArray(json)
+        ? json
+        : Array.isArray(json.transactions)
+        ? json.transactions
+        : []
+      setTransactions(txList)
+    } catch {
+      setTransactions([])
+    } finally {
+      setTxLoading(false)
+    }
+  }, [periodKey])
 
-  const currentMonth = new Date().toISOString().substring(0, 7)
-  const current = data.find((d) => d.month === currentMonth) || data[data.length - 1]
+  useEffect(() => { loadSummary() }, [loadSummary])
+  useEffect(() => { loadTransactions() }, [loadTransactions])
 
-  const totalOutput = current ? current.outputCGST + current.outputSGST + current.outputIGST : 0
-  const totalInput = current ? current.inputCGST + current.inputSGST + current.inputIGST : 0
-  const totalNet = current?.netPayable ?? 0
+  // ── Derived figures for the selected period ──────────────────────────────────
+  const periodData = allData.find((d) => d.month === periodKey)
 
-  const allOutput = data.reduce((s, m) => s + m.outputCGST + m.outputSGST + m.outputIGST, 0)
-  const allInput = data.reduce((s, m) => s + m.inputCGST + m.inputSGST + m.inputIGST, 0)
+  const outputGST = periodData
+    ? periodData.outputCGST + periodData.outputSGST + periodData.outputIGST
+    : 0
+  const inputCredit = periodData
+    ? periodData.inputCGST + periodData.inputSGST + periodData.inputIGST
+    : 0
+  const netPayable = periodData ? periodData.netPayable : 0
+
+  // ── GSTR-1 groupings ─────────────────────────────────────────────────────────
+  const b2bTx = transactions.filter((t) => t.type === 'B2B' && t.direction === 'output')
+  const b2cTx = transactions.filter((t) => t.type === 'B2C' && t.direction === 'output')
+
+  const b2bTaxable = b2bTx.reduce((s, t) => s + t.taxableAmount, 0)
+  const b2bGST = b2bTx.reduce((s, t) => s + t.cgst + t.sgst + t.igst, 0)
+  const b2cTaxable = b2cTx.reduce((s, t) => s + t.taxableAmount, 0)
+  const b2cGST = b2cTx.reduce((s, t) => s + t.cgst + t.sgst + t.igst, 0)
+
+  // ── Download GSTR-1 CSV ───────────────────────────────────────────────────────
+  function downloadGSTR1() {
+    const outTx = transactions.filter((t) => t.direction === 'output')
+    if (outTx.length === 0) {
+      alert('No outward supply transactions found for this period.')
+      return
+    }
+    const rows = outTx.map((t) => ({
+      'Invoice No': t.invoiceNumber,
+      'Date': t.date,
+      'Party Name': t.party,
+      'Invoice Type': t.type,
+      'Taxable Value': t.taxableAmount,
+      'CGST': t.cgst,
+      'SGST': t.sgst,
+      'IGST': t.igst,
+      'Total Tax': t.cgst + t.sgst + t.igst,
+      'Invoice Total': t.total,
+    }))
+    downloadCSV(`GSTR-1_${periodKey}.csv`, toCSV(rows))
+  }
+
+  // ── Download GSTR-3B CSV ──────────────────────────────────────────────────────
+  function downloadGSTR3B() {
+    if (!periodData) {
+      alert('No GST summary data found for this period.')
+      return
+    }
+    const rows = [
+      {
+        'Period': periodKey,
+        'Output CGST': periodData.outputCGST,
+        'Output SGST': periodData.outputSGST,
+        'Output IGST': periodData.outputIGST,
+        'Total Output Tax': outputGST,
+        'Input CGST': periodData.inputCGST,
+        'Input SGST': periodData.inputSGST,
+        'Input IGST': periodData.inputIGST,
+        'Total Input Credit': inputCredit,
+        'Net Payable': netPayable,
+      },
+    ]
+    downloadCSV(`GSTR-3B_${periodKey}.csv`, toCSV(rows))
+  }
+
+  const years = buildYearOptions()
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-6 space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="max-w-6xl mx-auto py-8 px-6 space-y-6">
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">GST Centre</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Reconciliation &amp; Summary — file returns directly on GST portal</p>
-        </div>
-        <div className="flex gap-2 flex-wrap justify-end">
-          <a
-            href="https://www.gst.gov.in/auth/login"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
-          >
-            <span>↗</span> GST Portal Login
-          </a>
-          <a
-            href="https://services.gst.gov.in/services/auth/login"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg font-medium transition-colors"
-          >
-            ↗ File GSTR-1
-          </a>
-          <a
-            href="https://services.gst.gov.in/services/auth/login"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg font-medium transition-colors"
-          >
-            ↗ File GSTR-3B
-          </a>
-        </div>
-      </div>
-
-      {/* GST Portal Connect + Download */}
-      <div className="bg-orange-50 border border-orange-100 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-orange-100 flex items-center justify-between">
-          <p className="text-xs font-semibold text-orange-800 uppercase tracking-wide">GST Portal — Connect &amp; Download Reports</p>
-        </div>
-        <div className="p-4 space-y-4">
-
-          {/* GSTIN entry */}
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-slate-600 mb-1">Your GSTIN</label>
-              <input
-                value={gstin}
-                onChange={e => { setGstin(e.target.value.toUpperCase()); setGstinSaved(false) }}
-                placeholder="22AAAAA0000A1Z5"
-                maxLength={15}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-400"
-              />
-            </div>
-            <button
-              onClick={() => { localStorage.setItem('onk_gstin', gstin); setGstinSaved(true) }}
-              className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm rounded-lg font-medium transition-colors"
-            >
-              Save
-            </button>
-            {gstinSaved && <span className="text-xs text-green-600">Saved ✓</span>}
-          </div>
-          {!gstin && (
-            <p className="text-xs text-orange-600">Enter your GSTIN above to get personalised portal links for your account.</p>
-          )}
-
-          {/* Portal quick links — personalised when GSTIN present */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              {
-                label: 'GSTR-1',
-                desc: 'File outward supplies',
-                href: gstin
-                  ? `https://services.gst.gov.in/services/auth/login`
-                  : 'https://www.gst.gov.in/auth/login',
-              },
-              {
-                label: 'GSTR-3B',
-                desc: 'Monthly summary return',
-                href: 'https://services.gst.gov.in/services/auth/login',
-              },
-              {
-                label: 'GSTR-2B ⬇',
-                desc: 'Download ITC statement',
-                href: 'https://services.gst.gov.in/services/auth/login',
-              },
-              {
-                label: 'E-Way Bill',
-                desc: 'Generate / verify EWB',
-                href: 'https://ewaybillgst.gov.in/login.aspx',
-              },
-            ].map(({ label, desc, href }) => (
-              <a
-                key={label}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-col gap-0.5 bg-white border border-orange-100 rounded-lg px-3 py-2.5 hover:border-orange-300 hover:shadow-sm transition-all group"
-              >
-                <span className="text-xs font-semibold text-orange-700 group-hover:text-orange-900">{label} ↗</span>
-                <span className="text-[11px] text-slate-500">{desc}</span>
-              </a>
-            ))}
-          </div>
-
-          {/* GSTR-2B JSON import */}
-          <div className="bg-white border border-orange-100 rounded-xl p-4">
-            <p className="text-sm font-semibold text-slate-700 mb-1">Import GSTR-2B (ITC Reconciliation)</p>
-            <p className="text-xs text-slate-500 mb-3">
-              On the GST portal: Returns → ITC → GSTR-2B → Download JSON. Upload that file here to reconcile your input tax credit automatically.
-            </p>
-            <div className="flex gap-3 items-center">
-              <input
-                ref={gstr2bRef}
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={e => setGstr2bFile(e.target.files?.[0] ?? null)}
-              />
-              <button
-                onClick={() => gstr2bRef.current?.click()}
-                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50"
-              >
-                {gstr2bFile ? gstr2bFile.name : 'Choose GSTR-2B JSON…'}
-              </button>
-              {gstr2bFile && (
-                <button
-                  disabled={gstr2bImporting}
-                  onClick={async () => {
-                    setGstr2bImporting(true)
-                    setGstr2bMsg('')
-                    try {
-                      const text = await gstr2bFile.text()
-                      const json = JSON.parse(text)
-                      // Count ITC entries from GSTR-2B structure
-                      const b2b = json?.data?.docdata?.b2b ?? json?.docdata?.b2b ?? []
-                      const count = b2b.reduce((s: number, sup: {inv?: unknown[]}) => s + (sup.inv?.length ?? 0), 0)
-                      setGstr2bMsg(`✓ Parsed ${count} invoice(s) from ${b2b.length} supplier(s). Reconciliation coming soon.`)
-                    } catch {
-                      setGstr2bMsg('Could not parse file. Please upload the JSON downloaded from the GST portal.')
-                    } finally {
-                      setGstr2bImporting(false)
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 disabled:bg-orange-300 text-white text-sm rounded-lg font-medium transition-colors"
-                >
-                  {gstr2bImporting ? 'Processing…' : 'Import & Reconcile'}
-                </button>
-              )}
-            </div>
-            {gstr2bMsg && <p className="text-xs text-slate-600 mt-2">{gstr2bMsg}</p>}
-          </div>
-
-          <p className="text-[11px] text-orange-600">
-            Note: ONK Solutions links directly to the GST portal — your GSTIN login and OTP are handled by the government portal, not stored here.
+          <h1 className="text-2xl font-bold text-slate-900">GST Compliance</h1>
+          <p className="text-slate-500 text-sm mt-0.5">
+            Returns reconciliation — file on the GST portal after review
           </p>
         </div>
+        <a
+          href="https://www.gst.gov.in/auth/login"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+        >
+          GST Portal Login &rarr;
+        </a>
       </div>
 
-      {error && <p className="text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm">{error}</p>}
+      {/* ── Period Selector ─────────────────────────────────────────────────── */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-6 py-4">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+          Return Period
+        </p>
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-500 font-medium">Month</label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+            >
+              {MONTHS.map((m, i) => (
+                <option key={m} value={i}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-500 font-medium">Year</label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 mt-auto">
+            <span className="text-xs text-slate-400">Selected period</span>
+            <span className="text-sm font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+              {MONTHS[selectedMonth]} {selectedYear}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <p className="text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm">
+          {error}
+        </p>
+      )}
 
       {loading ? (
-        <div className="text-center py-16 text-slate-400">Loading GST data…</div>
+        <div className="text-center py-20 text-slate-400">Loading GST data&hellip;</div>
       ) : (
         <>
-          {/* Current Month Summary */}
-          {current && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-              <h2 className="font-semibold text-slate-800 mb-4">
-                Current Month Summary — {current.month}
-              </h2>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-                  <p className="text-xs font-medium text-red-700 mb-1">Output Tax (Collected)</p>
-                  <p className="text-xl font-bold text-red-900">{formatCurrency(totalOutput)}</p>
-                  <div className="mt-2 space-y-0.5 text-xs text-red-700">
-                    <p>CGST: {formatCurrency(current.outputCGST)}</p>
-                    <p>SGST: {formatCurrency(current.outputSGST)}</p>
-                    <p>IGST: {formatCurrency(current.outputIGST)}</p>
-                  </div>
+          {/* ── Summary Cards ──────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Output GST */}
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                Output GST (from Sales)
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mb-3">
+                {formatCurrency(outputGST)}
+              </p>
+              <div className="space-y-1 text-xs text-slate-600 border-t border-slate-100 pt-3">
+                <div className="flex justify-between">
+                  <span>CGST</span>
+                  <span className="font-mono">{formatCurrency(periodData?.outputCGST ?? 0)}</span>
                 </div>
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                  <p className="text-xs font-medium text-blue-700 mb-1">Input Credit (Paid)</p>
-                  <p className="text-xl font-bold text-blue-900">{formatCurrency(totalInput)}</p>
-                  <div className="mt-2 space-y-0.5 text-xs text-blue-700">
-                    <p>CGST: {formatCurrency(current.inputCGST)}</p>
-                    <p>SGST: {formatCurrency(current.inputSGST)}</p>
-                    <p>IGST: {formatCurrency(current.inputIGST)}</p>
-                  </div>
+                <div className="flex justify-between">
+                  <span>SGST</span>
+                  <span className="font-mono">{formatCurrency(periodData?.outputSGST ?? 0)}</span>
                 </div>
-                <div className={`rounded-xl p-4 border ${totalNet >= 0 ? 'bg-green-50 border-green-100' : 'bg-orange-50 border-orange-100'}`}>
-                  <p className={`text-xs font-medium mb-1 ${totalNet >= 0 ? 'text-green-700' : 'text-orange-700'}`}>
-                    {totalNet >= 0 ? 'Net Payable' : 'Net Refund'}
-                  </p>
-                  <p className={`text-xl font-bold ${totalNet >= 0 ? 'text-green-900' : 'text-orange-900'}`}>
-                    {formatCurrency(Math.abs(totalNet))}
-                  </p>
-                  <p className={`text-xs mt-2 ${totalNet >= 0 ? 'text-green-700' : 'text-orange-700'}`}>
-                    Output − Input Credit
-                  </p>
+                <div className="flex justify-between">
+                  <span>IGST</span>
+                  <span className="font-mono">{formatCurrency(periodData?.outputIGST ?? 0)}</span>
                 </div>
               </div>
             </div>
-          )}
 
-          {/* GSTR-1 Summary */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <h2 className="font-semibold text-slate-800 mb-1">GSTR-1 Summary (Outward Supplies)</h2>
-            <p className="text-xs text-slate-500 mb-4">Aggregate output GST for the period</p>
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              {[
-                { label: 'Total CGST Collected', value: data.reduce((s, m) => s + m.outputCGST, 0) },
-                { label: 'Total SGST Collected', value: data.reduce((s, m) => s + m.outputSGST, 0) },
-                { label: 'Total IGST Collected', value: data.reduce((s, m) => s + m.outputIGST, 0) },
-              ].map(({ label, value }) => (
-                <div key={label} className="bg-slate-50 rounded-lg px-4 py-3">
-                  <p className="text-slate-500 text-xs">{label}</p>
-                  <p className="font-semibold text-slate-800 mt-0.5">{formatCurrency(value)}</p>
+            {/* Input Credit */}
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                Input Credit (from Purchases)
+              </p>
+              <p className="text-2xl font-bold text-blue-700 mb-3">
+                {formatCurrency(inputCredit)}
+              </p>
+              <div className="space-y-1 text-xs text-slate-600 border-t border-slate-100 pt-3">
+                <div className="flex justify-between">
+                  <span>CGST</span>
+                  <span className="font-mono">{formatCurrency(periodData?.inputCGST ?? 0)}</span>
                 </div>
-              ))}
+                <div className="flex justify-between">
+                  <span>SGST</span>
+                  <span className="font-mono">{formatCurrency(periodData?.inputSGST ?? 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>IGST</span>
+                  <span className="font-mono">{formatCurrency(periodData?.inputIGST ?? 0)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Net Payable */}
+            <div
+              className={`rounded-xl shadow-sm p-5 border ${
+                netPayable >= 0
+                  ? 'bg-green-50 border-green-200'
+                  : 'bg-orange-50 border-orange-200'
+              }`}
+            >
+              <p
+                className={`text-xs font-semibold uppercase tracking-wide mb-1 ${
+                  netPayable >= 0 ? 'text-green-700' : 'text-orange-700'
+                }`}
+              >
+                {netPayable >= 0 ? 'Net Payable' : 'Net Refundable'}
+              </p>
+              <p
+                className={`text-2xl font-bold mb-3 ${
+                  netPayable >= 0 ? 'text-green-900' : 'text-orange-900'
+                }`}
+              >
+                {formatCurrency(Math.abs(netPayable))}
+              </p>
+              <div
+                className={`text-xs border-t pt-3 space-y-1 ${
+                  netPayable >= 0
+                    ? 'border-green-200 text-green-800'
+                    : 'border-orange-200 text-orange-800'
+                }`}
+              >
+                <div className="flex justify-between">
+                  <span>Output GST</span>
+                  <span className="font-mono">+ {formatCurrency(outputGST)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Input Credit</span>
+                  <span className="font-mono">- {formatCurrency(inputCredit)}</span>
+                </div>
+                <div className="flex justify-between font-semibold border-t pt-1 mt-1 border-current/20">
+                  <span>{netPayable >= 0 ? 'Payable' : 'Refund'}</span>
+                  <span className="font-mono">{formatCurrency(Math.abs(netPayable))}</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* GSTR-3B Summary */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <h2 className="font-semibold text-slate-800 mb-1">GSTR-3B Summary (Net Tax Payable)</h2>
-            <p className="text-xs text-slate-500 mb-4">Aggregate input credit vs output for the period</p>
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              {[
-                { label: 'Total Output Tax', value: allOutput },
-                { label: 'Total Input Credit', value: allInput },
-                { label: 'Net Payable / (Refund)', value: allOutput - allInput },
-              ].map(({ label, value }) => (
-                <div key={label} className={`rounded-lg px-4 py-3 ${value < 0 ? 'bg-orange-50' : 'bg-slate-50'}`}>
-                  <p className="text-slate-500 text-xs">{label}</p>
-                  <p className={`font-semibold mt-0.5 ${value < 0 ? 'text-orange-700' : 'text-slate-800'}`}>{formatCurrency(value)}</p>
-                </div>
-              ))}
+          {/* ── Transaction Table ───────────────────────────────────────────────── */}
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="font-semibold text-slate-800">
+                  GST Transactions &mdash; {MONTHS[selectedMonth]} {selectedYear}
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  All taxable entries recorded for this period
+                </p>
+              </div>
+              {transactions.length > 0 && (
+                <span className="text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                  {transactions.length} record{transactions.length !== 1 ? 's' : ''}
+                </span>
+              )}
             </div>
-          </div>
 
-          {/* Month-wise table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-800">Month-wise GST Breakup</h2>
-            </div>
-            {data.length === 0 ? (
-              <p className="text-center py-10 text-slate-400 text-sm">No GST transactions recorded yet.</p>
+            {txLoading ? (
+              <div className="text-center py-12 text-slate-400 text-sm">
+                Loading transactions&hellip;
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="text-center py-14 text-slate-400 text-sm">
+                No GST transactions found for this period.
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      {['Month', 'Out CGST', 'Out SGST', 'Out IGST', 'In CGST', 'In SGST', 'In IGST', 'Net Payable'].map((h) => (
-                        <th key={h} className="px-4 py-3 text-left font-medium text-slate-600">{h}</th>
+                      {[
+                        'Date', 'Invoice No', 'Party', 'Type', 'Direction',
+                        'Taxable Amt', 'CGST', 'SGST', 'IGST', 'Total Tax',
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="px-4 py-3 text-left text-xs font-semibold text-slate-600 whitespace-nowrap"
+                        >
+                          {h}
+                        </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
-                    {data.map((row) => (
-                      <tr key={row.month} className="border-b border-slate-50 hover:bg-slate-50">
-                        <td className="px-4 py-3 font-medium text-slate-700">{row.month}</td>
-                        <td className="px-4 py-3 font-mono text-slate-600">{formatCurrency(row.outputCGST)}</td>
-                        <td className="px-4 py-3 font-mono text-slate-600">{formatCurrency(row.outputSGST)}</td>
-                        <td className="px-4 py-3 font-mono text-slate-600">{formatCurrency(row.outputIGST)}</td>
-                        <td className="px-4 py-3 font-mono text-slate-600">{formatCurrency(row.inputCGST)}</td>
-                        <td className="px-4 py-3 font-mono text-slate-600">{formatCurrency(row.inputSGST)}</td>
-                        <td className="px-4 py-3 font-mono text-slate-600">{formatCurrency(row.inputIGST)}</td>
-                        <td className={`px-4 py-3 font-mono font-semibold ${row.netPayable >= 0 ? 'text-green-700' : 'text-orange-600'}`}>
-                          {formatCurrency(Math.abs(row.netPayable))}
-                          {row.netPayable < 0 && <span className="text-xs ml-1">(Refund)</span>}
+                  <tbody className="divide-y divide-slate-50">
+                    {transactions.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{tx.date}</td>
+                        <td className="px-4 py-3 font-mono text-slate-700 text-xs whitespace-nowrap">
+                          {tx.invoiceNumber}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 max-w-[180px] truncate">
+                          {tx.party}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              tx.type === 'B2B'
+                                ? 'bg-purple-100 text-purple-700'
+                                : tx.type === 'B2C'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {tx.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              tx.direction === 'output'
+                                ? 'bg-red-50 text-red-700'
+                                : 'bg-green-50 text-green-700'
+                            }`}
+                          >
+                            {tx.direction === 'output' ? 'Sale' : 'Purchase'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-700 whitespace-nowrap">
+                          {formatCurrency(tx.taxableAmount)}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
+                          {formatCurrency(tx.cgst)}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
+                          {formatCurrency(tx.sgst)}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
+                          {formatCurrency(tx.igst)}
+                        </td>
+                        <td className="px-4 py-3 font-mono font-semibold text-slate-800 whitespace-nowrap">
+                          {formatCurrency(tx.cgst + tx.sgst + tx.igst)}
                         </td>
                       </tr>
                     ))}
@@ -340,8 +458,209 @@ export default function GstPage() {
             )}
           </div>
 
+          {/* ── GSTR-1 Summary ─────────────────────────────────────────────────── */}
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-slate-800">GSTR-1 Summary &mdash; Outward Supplies</h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Invoices issued during {MONTHS[selectedMonth]} {selectedYear}
+                </p>
+              </div>
+              <button
+                onClick={downloadGSTR1}
+                className="flex items-center gap-2 text-sm bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                Download GSTR-1 CSV
+              </button>
+            </div>
+            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* B2B */}
+              <div className="border border-slate-100 rounded-xl p-4 bg-slate-50">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      B2B Invoices
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">Registered buyers (GSTIN)</p>
+                  </div>
+                  <span className="text-xs font-semibold bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full">
+                    {b2bTx.length} invoices
+                  </span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Taxable Value</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {formatCurrency(b2bTaxable)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>GST Charged</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {formatCurrency(b2bGST)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-600 border-t border-slate-200 pt-2 mt-2">
+                    <span className="font-medium">Invoice Total</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {formatCurrency(b2bTaxable + b2bGST)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* B2C */}
+              <div className="border border-slate-100 rounded-xl p-4 bg-slate-50">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      B2C Invoices
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">Unregistered / end consumers</p>
+                  </div>
+                  <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">
+                    {b2cTx.length} invoices
+                  </span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Taxable Value</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {formatCurrency(b2cTaxable)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>GST Charged</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {formatCurrency(b2cGST)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-600 border-t border-slate-200 pt-2 mt-2">
+                    <span className="font-medium">Invoice Total</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {formatCurrency(b2cTaxable + b2cGST)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── GSTR-3B Summary ─────────────────────────────────────────────────── */}
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-slate-800">GSTR-3B Summary &mdash; Net Tax Payable</h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Monthly consolidated return for {MONTHS[selectedMonth]} {selectedYear}
+                </p>
+              </div>
+              <button
+                onClick={downloadGSTR3B}
+                className="flex items-center gap-2 text-sm bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                Download GSTR-3B CSV
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="pb-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        Head
+                      </th>
+                      <th className="pb-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        CGST
+                      </th>
+                      <th className="pb-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        SGST
+                      </th>
+                      <th className="pb-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        IGST
+                      </th>
+                      <th className="pb-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    <tr>
+                      <td className="py-3 text-slate-700 font-medium">Output Tax (3.1)</td>
+                      <td className="py-3 text-right font-mono text-slate-600">
+                        {formatCurrency(periodData?.outputCGST ?? 0)}
+                      </td>
+                      <td className="py-3 text-right font-mono text-slate-600">
+                        {formatCurrency(periodData?.outputSGST ?? 0)}
+                      </td>
+                      <td className="py-3 text-right font-mono text-slate-600">
+                        {formatCurrency(periodData?.outputIGST ?? 0)}
+                      </td>
+                      <td className="py-3 text-right font-mono font-semibold text-slate-800">
+                        {formatCurrency(outputGST)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-3 text-slate-700 font-medium">Input Tax Credit (4)</td>
+                      <td className="py-3 text-right font-mono text-blue-600">
+                        {formatCurrency(periodData?.inputCGST ?? 0)}
+                      </td>
+                      <td className="py-3 text-right font-mono text-blue-600">
+                        {formatCurrency(periodData?.inputSGST ?? 0)}
+                      </td>
+                      <td className="py-3 text-right font-mono text-blue-600">
+                        {formatCurrency(periodData?.inputIGST ?? 0)}
+                      </td>
+                      <td className="py-3 text-right font-mono font-semibold text-blue-700">
+                        {formatCurrency(inputCredit)}
+                      </td>
+                    </tr>
+                    <tr className="border-t-2 border-slate-300 bg-slate-50">
+                      <td className="py-3 px-2 font-bold text-slate-800">
+                        {netPayable >= 0 ? 'Net Tax Payable (5)' : 'Net Refund (5)'}
+                      </td>
+                      <td className="py-3 text-right font-mono font-bold text-slate-900">
+                        {formatCurrency(
+                          Math.abs((periodData?.outputCGST ?? 0) - (periodData?.inputCGST ?? 0))
+                        )}
+                      </td>
+                      <td className="py-3 text-right font-mono font-bold text-slate-900">
+                        {formatCurrency(
+                          Math.abs((periodData?.outputSGST ?? 0) - (periodData?.inputSGST ?? 0))
+                        )}
+                      </td>
+                      <td className="py-3 text-right font-mono font-bold text-slate-900">
+                        {formatCurrency(
+                          Math.abs((periodData?.outputIGST ?? 0) - (periodData?.inputIGST ?? 0))
+                        )}
+                      </td>
+                      <td
+                        className={`py-3 text-right font-mono font-bold text-lg ${
+                          netPayable >= 0 ? 'text-green-700' : 'text-orange-600'
+                        }`}
+                      >
+                        {formatCurrency(Math.abs(netPayable))}
+                        {netPayable < 0 && (
+                          <span className="text-xs ml-1 font-medium">(Refund)</span>
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Footer Note ─────────────────────────────────────────────────────── */}
           <p className="text-xs text-slate-400 text-center pb-4">
-            Note: File returns directly on the GST portal — this page is for reconciliation only.
+            This page is for reconciliation purposes only. File your returns directly on the GST portal after verifying these figures.
           </p>
         </>
       )}

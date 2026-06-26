@@ -41,7 +41,7 @@ export default async function TenantLayout({ children }: { children: React.React
   const enabledModules = (modulesData ?? []).map((m) => m.module_key as ModuleKey)
 
   // Auto-enable core modules if missing (self-healing for tenants created before modules were added)
-  const CORE_MODULES: ModuleKey[] = ['dashboard', 'sales', 'purchases', 'expenses', 'receipts', 'payments', 'bank', 'reports']
+  const CORE_MODULES: ModuleKey[] = ['dashboard', 'sales', 'purchases', 'expenses', 'receipts', 'payments', 'customers', 'vendors', 'bank', 'gst', 'payroll', 'attendance', 'day_book', 'pnl', 'balance_sheet', 'debtors', 'creditors', 'reports', 'settings']
   const missing = CORE_MODULES.filter(m => !enabledModules.includes(m))
   if (missing.length > 0) {
     const rows = missing.map(m => ({
