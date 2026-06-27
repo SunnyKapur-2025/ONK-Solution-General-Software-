@@ -47,8 +47,8 @@ const FEATURES = [
     ),
   },
   {
-    title: 'Tally & Busy Export',
-    description: 'One-click export to Tally XML and Busy CSV. No more manual data entry.',
+    title: 'Universal Export',
+    description: 'One-click export to industry-standard formats. No more manual data entry.',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -108,7 +108,7 @@ export default function Home() {
           </h1>
 
           <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed">
-            One platform for accounting, GST, payroll, and reports — designed for Indian CAs, accountants, and small business owners. Inspired by QuickBooks, Zoho, and Tally.
+            One platform for accounting, GST, payroll, and reports — designed for Indian CAs, accountants, and small business owners.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">

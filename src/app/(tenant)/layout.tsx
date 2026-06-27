@@ -20,7 +20,7 @@ export default async function TenantLayout({ children }: { children: React.React
     .eq('user_id', user.id)
     .eq('is_active', true)
 
-  if (!memberships || memberships.length === 0) redirect('/companies/new')
+  if (!memberships || memberships.length === 0) redirect('/companies')
 
   // Pick active tenant from cookie if present and the user is a member of it;
   // otherwise fall back to first membership.
