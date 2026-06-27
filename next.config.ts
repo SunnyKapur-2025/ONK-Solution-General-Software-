@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
 
+  // Lint runs separately in CI; don't block production builds on lint warnings
+  eslint: { ignoreDuringBuilds: true },
+
   async headers() {
     return [
       {
