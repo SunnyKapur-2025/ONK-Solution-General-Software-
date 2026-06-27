@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { buildJournalLines, isBalanced } from '@/lib/accounting/auto-journal'
+import { rateLimit } from '@/lib/rate-limit'
 
 const SYSTEM_CODES: Record<string, string> = {
   CREDITORS: '2100',
@@ -27,7 +28,8 @@ async function resolveAccountId(
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { date, vendorId, vendorName, amount, paidFrom, narration, reference } = body
+    const { date, vendorId, partyId: partyIdFromBody, vendorName, amount, paidFrom, narration, reference } = body
+    const partyId = partyIdFromBody || vendorId
 
     if (!date || !amount || !paidFrom) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -37,12 +39,15 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const rl = rateLimit(user.id, 30, 60000)
+    if (!rl.ok) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+
     const { data: tenantUser } = await supabase
       .from('tenant_users')
       .select('tenant_id')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
     if (!tenantUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const tenantId = tenantUser.tenant_id
 
@@ -51,20 +56,35 @@ export async function POST(req: NextRequest) {
       ? await resolveAccountId(supabase, tenantId, 'CASH')
       : paidFrom
 
+    // Look up vendor-specific party account; fall back to generic creditors account
+    let partyAccountId = creditorsAccountId
+    if (partyId) {
+      const { data: partyRow, error: partyErr } = await supabase
+        .from('parties')
+        .select('account_id')
+        .eq('tenant_id', tenantId)
+        .eq('id', partyId)
+        .maybeSingle()
+      if (partyErr) {
+        console.error('Payment API: failed to load party', partyId, partyErr.message)
+        return NextResponse.json({ error: `Failed to load party: ${partyErr.message}` }, { status: 500 })
+      }
+      if (partyRow?.account_id) partyAccountId = partyRow.account_id
+    }
+
     const journalLines = buildJournalLines({
       type: 'payment',
       date,
       narration: narration || vendorName || 'Vendor payment',
       amount,
-      partyAccountId: creditorsAccountId,
-      ledgerAccountId: creditorsAccountId,
+      partyAccountId,
+      ledgerAccountId: partyAccountId,
       settlementAccountId: bankAccountId,
     })
 
-    // Override party line to use creditors account (not vendor id as account)
     const resolvedLines = journalLines.map((l) => ({
       ...l,
-      partyId: l.accountId === creditorsAccountId ? vendorId || null : null,
+      partyId: l.accountId === partyAccountId ? partyId || null : null,
     }))
 
     if (!isBalanced(resolvedLines)) {

@@ -1,9 +1,4 @@
-export type IndustryGroup =
-  | 'service'
-  | 'trading'
-  | 'professional'
-  | 'manufacturing'
-  | 'finance'
+export type IndustryGroup = 'service' | 'trading' | 'professional' | 'manufacturing' | 'finance'
 
 export interface Industry {
   id: string
@@ -13,31 +8,25 @@ export interface Industry {
 }
 
 export type ModuleKey =
+  | 'dashboard'
   | 'sales'
   | 'purchases'
   | 'expenses'
   | 'receipts'
   | 'payments'
-  | 'income'
-  | 'gst'
-  | 'tds'
+  | 'customers'
+  | 'vendors'
   | 'bank'
-  | 'cash'
+  | 'gst'
   | 'payroll'
   | 'attendance'
-  | 'invoices'
-  | 'debtors'
-  | 'creditors'
-  | 'aging'
+  | 'day_book'
   | 'pnl'
   | 'balance_sheet'
-  | 'cash_flow'
-  | 'depreciation'
-  | 'loans'
-  | 'stock'
-  | 'assets'
-  | 'dashboard'
+  | 'debtors'
+  | 'creditors'
   | 'reports'
+  | 'settings'
 
 export interface ModuleMeta {
   key: ModuleKey
@@ -62,7 +51,7 @@ export interface Tenant {
   phone?: string
   email?: string
   logo_url?: string
-  financial_year_start: number // month: 4 = April
+  financial_year_start: number
   is_active: boolean
   subscription_plan: 'starter' | 'professional' | 'enterprise' | 'onetime'
   subscription_expires_at?: string
@@ -103,12 +92,7 @@ export interface Account {
   opening_balance_type: 'dr' | 'cr'
 }
 
-export type AccountType =
-  | 'asset'
-  | 'liability'
-  | 'equity'
-  | 'income'
-  | 'expense'
+export type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense'
 
 export interface JournalEntry {
   id: string
@@ -124,15 +108,7 @@ export interface JournalEntry {
   created_at: string
 }
 
-export type VoucherType =
-  | 'journal'
-  | 'payment'
-  | 'receipt'
-  | 'sales'
-  | 'purchase'
-  | 'contra'
-  | 'credit_note'
-  | 'debit_note'
+export type VoucherType = 'journal' | 'payment' | 'receipt' | 'sales' | 'purchase' | 'contra' | 'credit_note' | 'debit_note'
 
 export interface JournalLine {
   id: string
@@ -144,4 +120,21 @@ export interface JournalLine {
   narration?: string
   party_id?: string
   cost_centre?: string
+}
+
+export interface Party {
+  id: string
+  tenant_id: string
+  name: string
+  type: 'customer' | 'vendor' | 'both'
+  gstin?: string
+  pan?: string
+  phone?: string
+  email?: string
+  address?: string
+  city?: string
+  state?: string
+  credit_days?: number
+  credit_limit?: number
+  is_active: boolean
 }

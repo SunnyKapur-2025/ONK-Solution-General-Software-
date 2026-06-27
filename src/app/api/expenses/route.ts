@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { buildJournalLines, isBalanced } from '@/lib/accounting/auto-journal'
-
-const SYSTEM_CODES: Record<string, string> = {
-  CASH: '1610',
-}
+import { resolveAccountId } from '@/lib/accounting/account-resolver'
+import { rateLimit } from '@/lib/rate-limit'
 
 const EXPENSE_CATEGORY_CODES: Record<string, string> = {
   rent:      '5300',
@@ -16,23 +14,6 @@ const EXPENSE_CATEGORY_CODES: Record<string, string> = {
   repairs:   '5800',
   misc:      '5920',
   other:     '5920',
-}
-
-async function resolveAccountId(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  tenantId: string,
-  idOrCode: string
-): Promise<string> {
-  if (idOrCode.match(/^[0-9a-f-]{36}$/i)) return idOrCode
-  const code = SYSTEM_CODES[idOrCode] || idOrCode
-  const { data } = await supabase
-    .from('accounts')
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .eq('code', code)
-    .maybeSingle()
-  if (!data) throw new Error(`Account not found for code "${code}". Please create it in Settings > Chart of Accounts.`)
-  return data.id
 }
 
 export async function POST(req: NextRequest) {
@@ -48,12 +29,15 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const rl = rateLimit(user.id, 30, 60000)
+    if (!rl.ok) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+
     const { data: tenantUser } = await supabase
       .from('tenant_users')
       .select('tenant_id')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
     if (!tenantUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const tenantId = tenantUser.tenant_id
 

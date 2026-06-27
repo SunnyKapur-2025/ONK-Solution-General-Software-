@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { formatCurrency, getCurrentFinancialYear } from '@/lib/utils'
 import type { PnLReport, AccountBalance } from '@/lib/accounting/reports'
 
@@ -135,7 +135,7 @@ export default function PnLReportPage() {
     return { prevFrom: shiftYear(f, -1), prevTo: shiftYear(t, -1) }
   }
 
-  async function loadReport() {
+  const loadReport = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -154,9 +154,9 @@ export default function PnLReportPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [from, to, compareEnabled])
 
-  useEffect(() => { loadReport() }, [])
+  useEffect(() => { loadReport() }, [loadReport])
 
   const netProfit = report?.netProfit ?? 0
   const isProfit = netProfit >= 0

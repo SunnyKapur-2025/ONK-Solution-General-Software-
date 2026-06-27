@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getActiveTenantUser } from '@/lib/active-tenant'
+import { rateLimit } from '@/lib/rate-limit'
 
 const DEMO_ENTRIES = [
   {
@@ -96,6 +97,9 @@ export async function POST() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const rl = rateLimit(user.id, 30, 60000)
+    if (!rl.ok) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
     const tenantUser = await getActiveTenantUser(supabase, user.id)
     if (!tenantUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

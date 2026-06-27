@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { formatCurrency } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -102,8 +103,6 @@ const TDS_DEFAULT_RATES: Record<string, number> = {
   '194A': 10,
 }
 
-const STORAGE_KEY = 'onk_payroll_employees'
-
 // ─── Empty form state ─────────────────────────────────────────────────────────
 
 const emptyForm = (): Omit<Employee, 'id'> => ({
@@ -127,6 +126,7 @@ const emptyForm = (): Omit<Employee, 'id'> => ({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function PayrollPage() {
+  const { show } = useToast()
   const now = new Date()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -142,20 +142,23 @@ export default function PayrollPage() {
 
   const [selectedPayslip, setSelectedPayslip] = useState<PayslipRow | null>(null)
 
-  // Load from localStorage
-  useEffect(() => {
+  // Load from API
+  const fetchEmployees = async () => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) setEmployees(JSON.parse(raw))
-    } catch {
-      // ignore
+      const res = await fetch('/api/payroll/employees')
+      if (!res.ok) throw new Error(`Failed to load employees (${res.status})`)
+      const data = await res.json()
+      setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
+    } catch (err) {
+      console.error('[payroll] fetchEmployees failed', err)
+      show(err instanceof Error ? err.message : 'Failed to load employees', 'error')
     }
-  }, [])
-
-  const saveEmployees = (list: Employee[]) => {
-    setEmployees(list)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
   }
+
+  useEffect(() => {
+    fetchEmployees()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Form handlers ──────────────────────────────────────────────────────────
 
@@ -203,28 +206,67 @@ export default function PayrollPage() {
     return Object.keys(errors).length === 0
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return
-    if (editId) {
-      const updated = employees.map(e => e.id === editId ? { ...form, id: editId } : e)
-      saveEmployees(updated)
-    } else {
-      const newEmp: Employee = { ...form, id: crypto.randomUUID() }
-      saveEmployees([...employees, newEmp])
+    try {
+      if (editId) {
+        const res = await fetch(`/api/payroll/employees?id=${encodeURIComponent(editId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        })
+        if (!res.ok) throw new Error(`Failed to update employee (${res.status})`)
+        show('Employee updated.', 'success')
+      } else {
+        const res = await fetch('/api/payroll/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        })
+        if (!res.ok) throw new Error(`Failed to add employee (${res.status})`)
+        show('Employee added.', 'success')
+      }
+      await fetchEmployees()
+      closeForm()
+    } catch (err) {
+      console.error('[payroll] handleSubmit failed', err)
+      show(err instanceof Error ? err.message : 'Failed to save employee', 'error')
     }
-    closeForm()
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Remove this employee?')) return
-    saveEmployees(employees.filter(e => e.id !== id))
-    // also remove from payslip rows
-    setPayslipRows(r => r.filter(p => p.employee.id !== id))
+    try {
+      const res = await fetch(`/api/payroll/employees?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error(`Failed to delete employee (${res.status})`)
+      await fetchEmployees()
+      // also remove from payslip rows
+      setPayslipRows(r => r.filter(p => p.employee.id !== id))
+      show('Employee removed.', 'success')
+    } catch (err) {
+      console.error('[payroll] handleDelete failed', err)
+      show(err instanceof Error ? err.message : 'Failed to delete employee', 'error')
+    }
   }
 
-  const toggleActive = (id: string) => {
-    const updated = employees.map(e => e.id === id ? { ...e, isActive: !e.isActive } : e)
-    saveEmployees(updated)
+  const toggleActive = async (id: string) => {
+    const emp = employees.find(e => e.id === id)
+    if (!emp) return
+    const { id: _id, ...rest } = emp
+    try {
+      const res = await fetch(`/api/payroll/employees?id=${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...rest, isActive: !emp.isActive }),
+      })
+      if (!res.ok) throw new Error(`Failed to update status (${res.status})`)
+      await fetchEmployees()
+    } catch (err) {
+      console.error('[payroll] toggleActive failed', err)
+      show(err instanceof Error ? err.message : 'Failed to update status', 'error')
+    }
   }
 
   // ── Run payroll ────────────────────────────────────────────────────────────
@@ -232,7 +274,7 @@ export default function PayrollPage() {
   const handleRunPayroll = async () => {
     const active = employees.filter(e => e.isActive)
     if (active.length === 0) {
-      alert('No active employees found.')
+      show('No active employees found.', 'error')
       return
     }
     setRunningPayroll(true)
@@ -241,9 +283,9 @@ export default function PayrollPage() {
     setPayslipRows(rows)
     setPayrollRun(true)
 
-    // Call API route (fire-and-forget; UI stays functional even if fails)
+    // Call API route to persist the payroll run
     try {
-      await fetch('/api/payroll/run', {
+      const res = await fetch('/api/payroll/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -262,8 +304,11 @@ export default function PayrollPage() {
           })),
         }),
       })
-    } catch {
-      // non-fatal
+      if (!res.ok) throw new Error(`Payroll run failed (${res.status})`)
+      show(`Payroll processed for ${MONTHS[selectedMonth]} ${selectedYear}.`, 'success')
+    } catch (err) {
+      console.error('[payroll] handleRunPayroll failed', err)
+      show(err instanceof Error ? err.message : 'Failed to record payroll run', 'error')
     }
 
     setRunningPayroll(false)

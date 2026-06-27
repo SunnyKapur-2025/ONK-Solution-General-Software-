@@ -1,86 +1,75 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { getActiveTenantUser } from '@/lib/active-tenant';
 
-interface PayrollRunRow {
-  employeeId: string
-  employeeName: string
-  gross: number
-  netPay: number
-  pfEmployee: number
-  pfEmployer: number
-  esiEmployee: number
-  esiEmployer: number
-  tds: number
-}
-
-interface PayrollRunRequest {
-  month: number   // 0-indexed
-  year: number
-  rows: PayrollRunRow[]
-}
-
-// In-memory journal entries (demo). In production persist to Supabase journal_entries table.
-const journalEntries: Record<string, unknown>[] = []
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
+type PayrollRow = {
+  gross?: number;
+  net?: number;
+  total_gross?: number;
+  total_net?: number;
+};
 
 export async function POST(req: NextRequest) {
-  try {
-    const body: PayrollRunRequest = await req.json()
-    const { month, year, rows } = body
-
-    if (typeof month !== 'number' || typeof year !== 'number' || !Array.isArray(rows)) {
-      return NextResponse.json({ error: 'month (number), year (number), and rows (array) are required' }, { status: 400 })
-    }
-
-    const monthLabel = `${MONTH_NAMES[month]} ${year}`
-    const totalGross = rows.reduce((s, r) => s + r.gross, 0)
-    const totalNetPay = rows.reduce((s, r) => s + r.netPay, 0)
-    const totalPfEmployee = rows.reduce((s, r) => s + r.pfEmployee, 0)
-    const totalPfEmployer = rows.reduce((s, r) => s + r.pfEmployer, 0)
-    const totalEsiEmployee = rows.reduce((s, r) => s + r.esiEmployee, 0)
-    const totalEsiEmployer = rows.reduce((s, r) => s + r.esiEmployer, 0)
-    const totalTds = rows.reduce((s, r) => s + r.tds, 0)
-
-    // Create journal entries for payroll
-    // Dr Salary Expense (gross) / Cr Bank/Cash (net pay) + Cr PF Payable + Cr ESI Payable + Cr TDS Payable
-    const entry = {
-      id: crypto.randomUUID(),
-      date: new Date(`${year}-${String(month + 1).padStart(2, '0')}-01`).toISOString().split('T')[0],
-      narration: `Payroll for ${monthLabel} — ${rows.length} employee(s)`,
-      lines: [
-        { account: 'Salary Expense', type: 'debit', amount: totalGross },
-        ...(totalPfEmployer > 0 ? [{ account: 'PF Expense (Employer)', type: 'debit', amount: totalPfEmployer }] : []),
-        ...(totalEsiEmployer > 0 ? [{ account: 'ESI Expense (Employer)', type: 'debit', amount: totalEsiEmployer }] : []),
-        { account: 'Salaries Payable / Bank', type: 'credit', amount: totalNetPay },
-        ...(totalPfEmployee + totalPfEmployer > 0 ? [{ account: 'PF Payable', type: 'credit', amount: totalPfEmployee + totalPfEmployer }] : []),
-        ...(totalEsiEmployee + totalEsiEmployer > 0 ? [{ account: 'ESI Payable', type: 'credit', amount: totalEsiEmployee + totalEsiEmployer }] : []),
-        ...(totalTds > 0 ? [{ account: 'TDS Payable', type: 'credit', amount: totalTds }] : []),
-      ],
-      createdAt: new Date().toISOString(),
-    }
-
-    journalEntries.push(entry)
-
-    return NextResponse.json({
-      success: true,
-      journalEntryId: entry.id,
-      summary: {
-        month: monthLabel,
-        employees: rows.length,
-        totalGross,
-        totalNetPay,
-        totalPfEmployee,
-        totalPfEmployer,
-        totalEsiEmployee,
-        totalEsiEmployer,
-        totalTds,
-      },
-    })
-  } catch (err) {
-    console.error('[payroll/run POST]', err)
-    return NextResponse.json({ error: 'Failed to run payroll' }, { status: 500 })
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  let tenantId: string;
+  try {
+    const tenantUser = await getActiveTenantUser(supabase, user.id);
+    if (!tenantUser) {
+      return NextResponse.json({ error: 'No active tenant' }, { status: 403 });
+    }
+    tenantId = tenantUser.tenant_id;
+  } catch (err) {
+    console.error('[payroll/run] tenant resolution failed', { userId: user.id, err });
+    return NextResponse.json({ error: 'No active tenant' }, { status: 403 });
+  }
+
+  let body: { month?: number; year?: number; rows?: PayrollRow[] };
+  try {
+    body = await req.json();
+  } catch (err) {
+    console.error('[payroll/run] invalid json', err);
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const { month, year, rows } = body;
+  if (!month || !year || !Array.isArray(rows)) {
+    return NextResponse.json(
+      { error: 'month, year, and rows[] are required' },
+      { status: 400 }
+    );
+  }
+
+  const total_gross = rows.reduce(
+    (acc, r) => acc + Number(r.gross ?? r.total_gross ?? 0),
+    0
+  );
+  const total_net = rows.reduce(
+    (acc, r) => acc + Number(r.net ?? r.total_net ?? 0),
+    0
+  );
+
+  const { data, error } = await supabase
+    .from('payroll_runs')
+    .insert({
+      tenant_id: tenantId,
+      month,
+      year,
+      total_gross,
+      total_net,
+      created_by: user.id,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[payroll/run] insert failed', { tenantId, month, year, error });
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ payroll_run: data }, { status: 201 });
 }

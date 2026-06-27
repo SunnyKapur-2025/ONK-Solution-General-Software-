@@ -38,6 +38,23 @@ export async function POST(req: NextRequest) {
 
     const tenantId = tenantUser.tenant_id
 
+    // SECURITY: validate that bankAccountId (if provided) belongs to this tenant
+    if (bankAccountId && bankAccountId !== 'default') {
+      const { data: ownedAccount } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('id', bankAccountId)
+        .eq('tenant_id', tenantUser.tenant_id)
+        .maybeSingle()
+
+      if (!ownedAccount) {
+        return NextResponse.json(
+          { error: 'Bank account not found or access denied' },
+          { status: 403 },
+        )
+      }
+    }
+
     // Resolve the bank account ledger ID
     let bankLedgerId: string | null = null
     if (bankAccountId && bankAccountId !== 'default') {

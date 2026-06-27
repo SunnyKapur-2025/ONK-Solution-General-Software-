@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
       .select('tenant_id, tenants(name)')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
