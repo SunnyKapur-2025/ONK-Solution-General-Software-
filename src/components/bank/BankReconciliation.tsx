@@ -264,7 +264,7 @@ export default function BankReconciliation({ bankAccountName, onImport, onReconc
               ← Upload Different Statement
             </button>
             <p className="text-xs text-slate-400 self-center">
-              Tip: Confirm "Matched" entries in bulk, then handle Suggested and Unmatched one by one.
+              Tip: Confirm &quot;Matched&quot; entries in bulk, then handle Suggested and Unmatched one by one.
             </p>
           </div>
         </>

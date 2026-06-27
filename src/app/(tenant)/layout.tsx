@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { ModuleKey } from '@/types'
 import AppShell from '@/components/layout/AppShell'
+import { ToastProvider } from '@/components/ui/Toast'
 
 const ACTIVE_TENANT_COOKIE = 'onk_active_tenant'
 
@@ -70,7 +71,7 @@ export default async function TenantLayout({ children }: { children: React.React
       enabledModules={enabledModules}
       companies={companies}
     >
-      {children}
+      <ToastProvider>{children}</ToastProvider>
     </AppShell>
   )
 }

@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 interface Company {
@@ -14,6 +15,7 @@ interface Company {
 }
 
 export default function CompaniesPage() {
+  const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
   const [switching, setSwitching] = useState<string | null>(null)
@@ -33,15 +35,15 @@ export default function CompaniesPage() {
   const [deleteInProgress, setDeleteInProgress] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  function loadCompanies() {
+  const loadCompanies = useCallback(() => {
     setLoading(true)
     fetch('/api/companies')
       .then((r) => r.json())
       .then((d) => { setCompanies(d.companies || []); setLoading(false) })
       .catch(() => setLoading(false))
-  }
+  }, [])
 
-  useEffect(() => { loadCompanies() }, [])
+  useEffect(() => { loadCompanies() }, [loadCompanies])
 
   async function pick(id: string) {
     setSwitching(id)
@@ -50,14 +52,14 @@ export default function CompaniesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tenantId: id }),
     })
-    window.location.href = '/dashboard'
+    router.push('/dashboard')
   }
 
   async function signOut() {
     setSigningOut(true)
     const supabase = createClient()
     await supabase.auth.signOut()
-    window.location.href = '/auth/login'
+    router.push('/auth/login')
   }
 
   function openEdit(c: Company) {

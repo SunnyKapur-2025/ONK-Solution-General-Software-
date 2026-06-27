@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { formatCurrency } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ function buildYearOptions() {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function GstPage() {
+  const { show } = useToast()
   const now = new Date()
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth()) // 0-indexed
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
@@ -149,7 +151,7 @@ export default function GstPage() {
   function downloadGSTR1() {
     const outTx = transactions.filter((t) => t.direction === 'output')
     if (outTx.length === 0) {
-      alert('No outward supply transactions found for this period.')
+      show('No outward supply transactions found for this period.', 'error')
       return
     }
     const rows = outTx.map((t) => ({
@@ -170,7 +172,7 @@ export default function GstPage() {
   // ── Download GSTR-3B CSV ──────────────────────────────────────────────────────
   function downloadGSTR3B() {
     if (!periodData) {
-      alert('No GST summary data found for this period.')
+      show('No GST summary data found for this period.', 'error')
       return
     }
     const rows = [

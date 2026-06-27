@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { formatCurrency } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -127,6 +128,7 @@ const emptyForm = (): Omit<Employee, 'id'> => ({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function PayrollPage() {
+  const { show } = useToast()
   const now = new Date()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -232,7 +234,7 @@ export default function PayrollPage() {
   const handleRunPayroll = async () => {
     const active = employees.filter(e => e.isActive)
     if (active.length === 0) {
-      alert('No active employees found.')
+      show('No active employees found.', 'error')
       return
     }
     setRunningPayroll(true)

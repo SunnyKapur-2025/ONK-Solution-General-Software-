@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
       .select('tenant_id')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
@@ -26,6 +26,30 @@ export async function GET(req: NextRequest) {
     }
     if (!from || !to) {
       return NextResponse.json({ error: 'from and to date params are required' }, { status: 400 })
+    }
+
+    // Validate accountId belongs to active tenant
+    if (accountId) {
+      const { data: acctCheck, error: acctCheckErr } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('id', accountId)
+        .eq('tenant_id', tenantUser.tenant_id)
+        .maybeSingle()
+      if (acctCheckErr) return NextResponse.json({ error: acctCheckErr.message }, { status: 500 })
+      if (!acctCheck) return NextResponse.json({ error: 'Account not found for active tenant' }, { status: 403 })
+    }
+
+    // Validate partyId belongs to active tenant
+    if (partyId) {
+      const { data: partyCheck, error: partyCheckErr } = await supabase
+        .from('parties')
+        .select('id')
+        .eq('id', partyId)
+        .eq('tenant_id', tenantUser.tenant_id)
+        .maybeSingle()
+      if (partyCheckErr) return NextResponse.json({ error: partyCheckErr.message }, { status: 500 })
+      if (!partyCheck) return NextResponse.json({ error: 'Party not found for active tenant' }, { status: 403 })
     }
 
     // Fetch account info

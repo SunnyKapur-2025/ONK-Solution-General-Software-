@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { formatCurrency } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -125,6 +126,7 @@ function downloadCSV(entries: DayBookEntry[], from: string, to: string) {
 // ---------------------------------------------------------------------------
 
 export default function DayBookPage() {
+  const { show } = useToast()
   const [from,       setFrom]       = useState(getMonthStart)
   const [to,         setTo]         = useState(getMonthEnd)
   const [typeFilter, setTypeFilter] = useState('all')
@@ -184,7 +186,7 @@ export default function DayBookPage() {
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Tally export failed.')
+      show(err instanceof Error ? err.message : 'Tally export failed.', 'error')
     } finally {
       setExporting(false)
     }

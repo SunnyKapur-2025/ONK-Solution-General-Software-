@@ -12,7 +12,7 @@ export async function GET() {
       .select('tenant_id, role')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { data, error } = await supabase
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       .select('tenant_id, role')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!['owner', 'superadmin'].includes(tenantUser.role)) {
@@ -101,7 +101,7 @@ export async function PATCH(req: NextRequest) {
       .select('tenant_id, role')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!['owner', 'superadmin'].includes(tenantUser.role)) {

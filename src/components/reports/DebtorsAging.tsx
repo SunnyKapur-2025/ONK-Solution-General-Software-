@@ -24,7 +24,6 @@ export default function AgingReport({ type }: Props) {
   const [error, setError] = useState('')
 
   const label = type === 'debtors' ? 'Debtors' : 'Creditors'
-  const colorClass = type === 'debtors' ? 'blue' : 'purple'
 
   useEffect(() => {
     fetch(`/api/reports/aging?type=${type}`)

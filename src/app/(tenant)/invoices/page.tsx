@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { formatCurrency } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 
 type Invoice = {
   id: string
@@ -23,6 +24,7 @@ type EditForm = {
 const GST_RATES = [0, 5, 12, 18, 28]
 
 export default function InvoicesPage() {
+  const { show } = useToast()
   const [tab, setTab] = useState<'list' | 'create'>('list')
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
@@ -165,7 +167,7 @@ export default function InvoicesPage() {
       setDeleteConfirmId(null)
       await loadInvoices()
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Failed to delete')
+      show(e instanceof Error ? e.message : 'Failed to delete', 'error')
     } finally {
       setDeleting(false)
     }

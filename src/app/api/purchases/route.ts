@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { buildJournalLines, isBalanced } from '@/lib/accounting/auto-journal'
-
-const SYSTEM_CODES: Record<string, string> = {
-  INPUT_CGST: '1650',
-  INPUT_SGST: '1651',
-  INPUT_IGST: '1652',
-  CREDITORS:  '2100',
-  CASH:       '1610',
-}
+import { resolveAccountId } from '@/lib/accounting/account-resolver'
+import { rateLimit } from '@/lib/rate-limit'
 
 const PURCHASE_CATEGORY_CODES: Record<string, string> = {
   goods:    '5200',
@@ -20,23 +14,6 @@ const PURCHASE_CATEGORY_CODES: Record<string, string> = {
   utility:  '5400',
   asset:    '1200',
   other:    '5920',
-}
-
-async function resolveAccountId(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  tenantId: string,
-  idOrCode: string
-): Promise<string> {
-  if (idOrCode.match(/^[0-9a-f-]{36}$/i)) return idOrCode
-  const code = SYSTEM_CODES[idOrCode] || idOrCode
-  const { data } = await supabase
-    .from('accounts')
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .eq('code', code)
-    .maybeSingle()
-  if (!data) throw new Error(`Account not found for code "${code}". Please create it in Settings > Chart of Accounts.`)
-  return data.id
 }
 
 export async function POST(req: NextRequest) {
@@ -55,6 +32,9 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const rl = rateLimit(user.id, 30, 60000)
+    if (!rl.ok) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
     const { data: tenantUser } = await supabase
       .from('tenant_users')
