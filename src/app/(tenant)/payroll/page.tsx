@@ -103,8 +103,6 @@ const TDS_DEFAULT_RATES: Record<string, number> = {
   '194A': 10,
 }
 
-const STORAGE_KEY = 'onk_payroll_employees'
-
 // ─── Empty form state ─────────────────────────────────────────────────────────
 
 const emptyForm = (): Omit<Employee, 'id'> => ({
@@ -144,20 +142,23 @@ export default function PayrollPage() {
 
   const [selectedPayslip, setSelectedPayslip] = useState<PayslipRow | null>(null)
 
-  // Load from localStorage
-  useEffect(() => {
+  // Load from API
+  const fetchEmployees = async () => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) setEmployees(JSON.parse(raw))
-    } catch {
-      // ignore
+      const res = await fetch('/api/payroll/employees')
+      if (!res.ok) throw new Error(`Failed to load employees (${res.status})`)
+      const data = await res.json()
+      setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
+    } catch (err) {
+      console.error('[payroll] fetchEmployees failed', err)
+      show(err instanceof Error ? err.message : 'Failed to load employees', 'error')
     }
-  }, [])
-
-  const saveEmployees = (list: Employee[]) => {
-    setEmployees(list)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
   }
+
+  useEffect(() => {
+    fetchEmployees()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Form handlers ──────────────────────────────────────────────────────────
 

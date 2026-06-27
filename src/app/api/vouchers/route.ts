@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       .select('tenant_id, name')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
     if (!tenantUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Use timestamp as sequence to avoid DB roundtrip

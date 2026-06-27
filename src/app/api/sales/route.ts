@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       .select('tenant_id')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
     if (!tenantUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const tenantId = tenantUser.tenant_id
 
