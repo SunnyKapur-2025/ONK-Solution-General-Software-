@@ -41,7 +41,9 @@ export default function CompaniesPage() {
       .then((r) => r.json())
       .then((d) => { setCompanies(d.companies || []); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { loadCompanies() }, [])
 
   useEffect(() => { loadCompanies() }, [loadCompanies])
 
