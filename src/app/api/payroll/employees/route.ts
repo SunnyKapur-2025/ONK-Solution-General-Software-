@@ -1,6 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveTenantUser } from '@/lib/active-tenant';
+import { EmployeeSchema, validateBody } from '@/lib/validation/schemas';
+
+const ALLOWED_COLUMNS = [
+  'name',
+  'designation',
+  'department',
+  'basic_salary',
+  'hra_percent',
+  'other_allowances',
+  'pf_applicable',
+  'esi_applicable',
+  'tds_section',
+  'tds_rate',
+  'bank_account',
+  'bank_name',
+  'ifsc',
+  'joining_date',
+  'is_active',
+] as const;
+
+function pickAllowed(body: Record<string, unknown>): {
+  ok: true;
+  data: Record<string, unknown>;
+} | { ok: false; error: string } {
+  const allowed = new Set<string>(ALLOWED_COLUMNS);
+  const extraneous = Object.keys(body).filter((k) => !allowed.has(k));
+  if (extraneous.length > 0) {
+    return { ok: false, error: `Unexpected fields: ${extraneous.join(', ')}` };
+  }
+  const picked: Record<string, unknown> = {};
+  for (const key of ALLOWED_COLUMNS) {
+    if (key in body) picked[key] = body[key];
+  }
+  return { ok: true, data: picked };
+}
 
 async function getContext() {
   const supabase = await createClient();
@@ -47,8 +82,15 @@ export async function POST(req: NextRequest) {
     console.error('[payroll/employees][POST] invalid json', err);
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  const payload = { ...body, tenant_id: tenantId };
-  delete (payload as Record<string, unknown>).id;
+  const picked = pickAllowed(body);
+  if (!picked.ok) {
+    return NextResponse.json({ error: picked.error }, { status: 400 });
+  }
+  const validated = validateBody(EmployeeSchema, picked.data);
+  if (!validated.ok) {
+    return NextResponse.json({ error: validated.error }, { status: 400 });
+  }
+  const payload = { ...validated.data, tenant_id: tenantId };
   const { data, error } = await supabase
     .from('employees')
     .insert(payload)
@@ -72,11 +114,19 @@ export async function PUT(req: NextRequest) {
     console.error('[payroll/employees][PUT] invalid json', err);
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  const { id, ...updates } = body as { id?: string } & Record<string, unknown>;
+  const { id, ...rest } = body as { id?: string } & Record<string, unknown>;
   if (!id) {
     return NextResponse.json({ error: 'Missing employee id' }, { status: 400 });
   }
-  delete (updates as Record<string, unknown>).tenant_id;
+  const picked = pickAllowed(rest);
+  if (!picked.ok) {
+    return NextResponse.json({ error: picked.error }, { status: 400 });
+  }
+  const validated = validateBody(EmployeeSchema.partial(), picked.data);
+  if (!validated.ok) {
+    return NextResponse.json({ error: validated.error }, { status: 400 });
+  }
+  const updates = validated.data;
   const { data, error } = await supabase
     .from('employees')
     .update(updates)

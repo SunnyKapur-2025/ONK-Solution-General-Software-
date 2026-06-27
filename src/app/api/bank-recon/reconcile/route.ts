@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
 
     const tenantId = tenantUser.tenant_id
     let reconciledCount = 0
+    const failed: Array<{ id: string; error: string }> = []
 
     for (const match of matches) {
       const { error } = await supabase
@@ -39,12 +40,22 @@ export async function POST(req: NextRequest) {
         .eq('tenant_id', tenantId)
         .eq('status', 'posted')
 
-      if (!error) reconciledCount++
+      if (error) {
+        console.error(
+          `[bank-recon/reconcile] Failed to reconcile journal entry ${match.journalEntryId}:`,
+          error.message,
+        )
+        failed.push({ id: match.journalEntryId, error: error.message })
+      } else {
+        reconciledCount++
+      }
     }
 
     return NextResponse.json({
       success: true,
+      reconciled: reconciledCount,
       reconciledCount,
+      failed,
       message: `${reconciledCount} of ${matches.length} entries reconciled.`,
     })
   } catch (err: unknown) {
