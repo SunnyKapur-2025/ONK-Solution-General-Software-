@@ -47,12 +47,18 @@ export default function CompaniesPage() {
 
   async function pick(id: string) {
     setSwitching(id)
-    await fetch('/api/companies/switch', {
+    const res = await fetch('/api/companies/switch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tenantId: id }),
     })
-    router.push('/dashboard')
+    if (!res.ok) {
+      setSwitching(null)
+      alert((await res.json()).error || 'Could not open company')
+      return
+    }
+    // Hard navigation so the tenant layout re-reads the cookie
+    window.location.assign('/dashboard')
   }
 
   async function signOut() {
