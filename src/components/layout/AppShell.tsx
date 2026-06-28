@@ -407,19 +407,26 @@ function CompanySwitcher({
           <p className="text-sm font-semibold text-slate-800 truncate">{tenantName}</p>
           <p className="text-xs text-slate-500">Company</p>
         </div>
-        {companies.length > 1 && (
-          <span className={`text-slate-400 transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
-            <IconChevronDown size={14} />
-          </span>
-        )}
+        <span className={`text-slate-400 transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
+          <IconChevronDown size={14} />
+        </span>
       </button>
 
-      {open && companies.length > 1 && (
-        <div className="absolute top-full left-0 right-0 z-50 bg-white border border-slate-200 rounded-b-lg shadow-lg max-h-48 overflow-y-auto">
+      {open && (
+        <div className="absolute top-full left-0 right-0 z-50 bg-white border border-slate-200 rounded-b-lg shadow-lg max-h-64 overflow-y-auto">
           {companies.map((c) => (
             <button
               key={c.id}
-              onClick={() => setOpen(false)}
+              onClick={async () => {
+                if (c.name === tenantName) { setOpen(false); return }
+                const res = await fetch('/api/companies/switch', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ tenantId: c.id }),
+                })
+                if (res.ok) window.location.assign('/dashboard')
+                else setOpen(false)
+              }}
               className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-left transition-colors ${
                 c.name === tenantName ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
               }`}
@@ -427,9 +434,28 @@ function CompanySwitcher({
               <div className="w-6 h-6 rounded flex-shrink-0 flex items-center justify-center text-white text-xs font-bold bg-slate-400">
                 {c.name.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm truncate">{c.name}</span>
+              <span className="text-sm truncate flex-1">{c.name}</span>
+              {c.name === tenantName && (
+                <span className="text-xs text-blue-600 font-medium">Active</span>
+              )}
             </button>
           ))}
+          <div className="border-t border-slate-100">
+            <a
+              href="/companies"
+              className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              <span className="w-6 h-6 rounded flex-shrink-0 flex items-center justify-center bg-slate-100 text-slate-500 text-xs">⚙</span>
+              <span>Manage companies</span>
+            </a>
+            <a
+              href="/companies/new"
+              className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              <span className="w-6 h-6 rounded flex-shrink-0 flex items-center justify-center bg-blue-50 text-blue-600 text-xs font-bold">+</span>
+              <span>Add new company</span>
+            </a>
+          </div>
         </div>
       )}
     </div>

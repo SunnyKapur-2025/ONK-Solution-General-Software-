@@ -31,10 +31,12 @@ export default function BalanceSheetPage() {
       ])
 
       if (!res.ok) throw new Error((await res.json()).error || 'Failed to load report')
-      setReport(await res.json())
+      const d = await res.json()
+      setReport(d.current ?? d)
 
       if (prevRes && prevRes.ok) {
-        setPrevReport(await prevRes.json())
+        const pd = await prevRes.json()
+        setPrevReport(pd.current ?? pd)
       } else {
         setPrevReport(null)
       }

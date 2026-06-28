@@ -142,13 +142,59 @@ export default function PayrollPage() {
 
   const [selectedPayslip, setSelectedPayslip] = useState<PayslipRow | null>(null)
 
+  // ── snake_case (DB) ↔ camelCase (UI) mappers ───────────────────────────────
+  type DbEmployee = {
+    id: string; name: string; designation?: string; department?: string
+    basic_salary?: number; hra_percent?: number; other_allowances?: number
+    pf_applicable?: boolean; esi_applicable?: boolean
+    tds_section?: string; tds_rate?: number
+    bank_account?: string; bank_name?: string; ifsc?: string
+    joining_date?: string; is_active?: boolean
+  }
+  const fromDb = (e: DbEmployee): Employee => ({
+    id: e.id,
+    name: e.name ?? '',
+    designation: e.designation ?? '',
+    department: e.department ?? '',
+    basicSalary: Number(e.basic_salary ?? 0),
+    hraPercent: Number(e.hra_percent ?? 0),
+    otherAllowances: Number(e.other_allowances ?? 0),
+    pfApplicable: e.pf_applicable ?? false,
+    esiApplicable: e.esi_applicable ?? false,
+    tdsSection: (e.tds_section as Employee['tdsSection']) ?? 'None',
+    tdsRate: Number(e.tds_rate ?? 0),
+    bankAccount: e.bank_account ?? '',
+    bankName: e.bank_name ?? '',
+    ifsc: e.ifsc ?? '',
+    joiningDate: e.joining_date ?? '',
+    isActive: e.is_active ?? true,
+  })
+  const toDb = (f: Omit<Employee, 'id'>) => ({
+    name: f.name,
+    designation: f.designation,
+    department: f.department,
+    basic_salary: f.basicSalary,
+    hra_percent: f.hraPercent,
+    other_allowances: f.otherAllowances,
+    pf_applicable: f.pfApplicable,
+    esi_applicable: f.esiApplicable,
+    tds_section: f.tdsSection,
+    tds_rate: f.tdsRate,
+    bank_account: f.bankAccount,
+    bank_name: f.bankName,
+    ifsc: f.ifsc,
+    joining_date: f.joiningDate || null,
+    is_active: f.isActive,
+  })
+
   // Load from API
   const fetchEmployees = async () => {
     try {
       const res = await fetch('/api/payroll/employees')
       if (!res.ok) throw new Error(`Failed to load employees (${res.status})`)
       const data = await res.json()
-      setEmployees(Array.isArray(data) ? data : (data.employees ?? []))
+      const list: DbEmployee[] = Array.isArray(data) ? data : (data.employees ?? [])
+      setEmployees(list.map(fromDb))
     } catch (err) {
       console.error('[payroll] fetchEmployees failed', err)
       show(err instanceof Error ? err.message : 'Failed to load employees', 'error')
@@ -213,7 +259,7 @@ export default function PayrollPage() {
         const res = await fetch(`/api/payroll/employees?id=${encodeURIComponent(editId)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(toDb(form)),
         })
         if (!res.ok) throw new Error(`Failed to update employee (${res.status})`)
         show('Employee updated.', 'success')
@@ -221,7 +267,7 @@ export default function PayrollPage() {
         const res = await fetch('/api/payroll/employees', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(toDb(form)),
         })
         if (!res.ok) throw new Error(`Failed to add employee (${res.status})`)
         show('Employee added.', 'success')
