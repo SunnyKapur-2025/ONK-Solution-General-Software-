@@ -69,8 +69,13 @@ function ImportCsvSection({ onImport }: ImportCsvProps) {
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const pdfRef = useRef<HTMLInputElement>(null)
 
   function handleFile(file: File) {
+    if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
+      handlePdf(file)
+      return
+    }
     setImporting(true)
     setImportMsg('')
     file.text().then(text => {
@@ -86,6 +91,29 @@ function ImportCsvSection({ onImport }: ImportCsvProps) {
       setImportMsg('Failed to read file.')
       setImporting(false)
     })
+  }
+
+  async function handlePdf(file: File) {
+    setImporting(true)
+    setImportMsg('Extracting transactions from PDF…')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/bank-recon/parse-pdf', { method: 'POST', body: fd })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || `PDF parse failed (${res.status})`)
+      const txns = (d.transactions || []) as Array<{ date: string; description: string; debit: number; credit: number }>
+      if (txns.length === 0) {
+        setImportMsg(d.error || 'Could not detect transactions in this PDF. Try a CSV export from your bank instead.')
+      } else {
+        onImport(txns.map(t => ({ date: t.date, description: t.description, debit: t.debit, credit: t.credit })))
+        setImportMsg(`${txns.length} transactions extracted from PDF (${d.bank || 'auto-detected'}).`)
+      }
+    } catch (e: unknown) {
+      setImportMsg(e instanceof Error ? e.message : 'PDF extraction failed.')
+    } finally {
+      setImporting(false)
+    }
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -106,18 +134,30 @@ function ImportCsvSection({ onImport }: ImportCsvProps) {
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-800">Import Bank Statement</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Upload a CSV file — columns: Date, Description, Debit, Credit</p>
+          <p className="text-xs text-slate-500 mt-0.5">Upload a CSV or PDF — we auto-extract transactions</p>
         </div>
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={importing}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" />
-          </svg>
-          {importing ? 'Importing...' : 'Import CSV'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => pdfRef.current?.click()}
+            disabled={importing}
+            className="flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Import PDF
+          </button>
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={importing}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" />
+            </svg>
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+        </div>
       </div>
 
       <div
@@ -129,11 +169,12 @@ function ImportCsvSection({ onImport }: ImportCsvProps) {
           dragOver ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
         }`}
       >
-        <p className="text-sm text-slate-500">Drop CSV here or click to browse</p>
-        <p className="text-xs text-slate-400 mt-1">Supports HDFC, ICICI, SBI, Axis and generic bank exports</p>
+        <p className="text-sm text-slate-500">Drop CSV or PDF here, or click to browse</p>
+        <p className="text-xs text-slate-400 mt-1">Auto-detects HDFC, ICICI, SBI, Axis, Kotak, PNB, BoB, Canara and more</p>
       </div>
 
-      <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleInputChange} />
+      <input ref={fileRef} type="file" accept=".csv,.pdf,application/pdf" className="hidden" onChange={handleInputChange} />
+      <input ref={pdfRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleInputChange} />
 
       {importMsg && (
         <p className={`text-xs mt-2 px-3 py-2 rounded-lg border ${

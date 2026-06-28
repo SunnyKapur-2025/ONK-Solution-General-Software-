@@ -520,24 +520,6 @@ export default function SettingsPage() {
       {/* Module Management */}
       <ModulesSection />
 
-      {/* Demo Data */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-3">
-        <div>
-          <h2 className="text-base font-semibold text-slate-800">Demo Data</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Load sample transactions (invoices, purchases, salary, etc.) to explore the software with realistic data.</p>
-        </div>
-        {seedMsg && (
-          <p className={`text-sm rounded-lg px-3 py-2 ${seedMsg.startsWith('✓') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{seedMsg}</p>
-        )}
-        <button
-          onClick={seedDemo}
-          disabled={seeding}
-          className="bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
-        >
-          {seeding ? 'Loading…' : '⚡ Load Demo Data'}
-        </button>
-      </div>
-
       <div className="flex justify-end">
         <button
           onClick={handleSave}
